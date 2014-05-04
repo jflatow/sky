@@ -209,7 +209,7 @@
   RGB.mix = function (x, opts) {
     var o = up({min: 0, max: 100, lo: {b: 100}, hi: {r: 100}}, opts)
     var m = o.min, M = o.max, lo = o.lo, hi = o.hi;
-    function w(a, b) { return ((b || 0) * Math.max(x - m, 0) + (a || 0) * Math.max(M - x, 0)) / (M - m) }
+    function w(a, b) { return ((b || 0) * max(x - m, 0) + (a || 0) * max(M - x, 0)) / (M - m) }
     function i(a, b) { return Math.round(w(a, b)) }
     if (lo.a == undefined && hi.a == undefined)
       return new RGB({r: i(lo.r, hi.r), g: i(lo.g, hi.g), b: i(lo.b, hi.b)})
@@ -218,11 +218,19 @@
   RGB.random = function () {
     return new RGB({r: util.randInt(0, 255), g: util.randInt(0, 255), b: util.randInt(0, 255)})
   }
-  RGB.prototype.toString = function () {
-    if (this.a == undefined)
-      return 'rgb(' + (this.r || 0) + ',' + (this.g || 0) + ',' + (this.b || 0) + ')';
-    return 'rgba(' + (this.r || 0) + ',' + (this.g || 0) + ',' + (this.b || 0) + ',' + this.a + ')';
-  }
+  RGB.prototype.update = function (obj) { return up(this, obj) }
+  RGB.prototype.update({
+    alpha: function (a) { return a == undefined ? this : this.update({a: a}) },
+    shift: function (x) {
+      function w(v) { return util.clip(v + x, 0, 255) }
+      return (new RGB({r: w(this.r || 0), g: w(this.g || 0), b: w(this.b || 0)})).alpha(this.a)
+    },
+    toString: function () {
+      if (this.a == undefined)
+        return 'rgb(' + (this.r || 0) + ',' + (this.g || 0) + ',' + (this.b || 0) + ')';
+      return 'rgba(' + (this.r || 0) + ',' + (this.g || 0) + ',' + (this.b || 0) + ',' + this.a + ')';
+    }
+  })
 
   function Elem(elem, attrs, props, doc) {
     this.node = elem && elem.nodeType ? elem : (doc || document).createElementNS(this.xmlns, elem)
