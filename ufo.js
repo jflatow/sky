@@ -21,6 +21,11 @@
       return this.segue(this.bind.apply(this, arguments))
     },
 
+    transition: function (state, opts) {
+      var self = this;
+      return this.segue(function () { return self.load(state, opts) })
+    },
+
     segue: function (fn) {
       var self = this;
       return function () {
