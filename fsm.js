@@ -35,7 +35,10 @@
       var B = A[d.input] || {}
       var C = B[d.leave] || {}
       var D = C[d.enter] || []
-      return L.drop(D, f), this;
+      var i = D.indexOf(f)
+      if (i >= 0)
+        delete D[i]
+      return this;
     },
     transition: function (l, e, u, args) {
       var A = this.T, self = this;
