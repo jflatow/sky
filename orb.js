@@ -2,7 +2,7 @@
   var U = Sky.util;
   var def = U.def, fnt = U.fnt, clip = U.clip;
   var pop = U.pop, up = U.update;
-  var abs = Math.abs, log = Math.log, E = Math.E, Inf = Infinity;
+  var abs = Math.abs, log = Math.log, rnd = Math.round, E = Math.E, Inf = Infinity;
   var sgn = function (x) { return x < 0 ? -1 : 1 }
   var cat = function (a, b) { return b ? [].concat(a, b) : a }
 
@@ -226,7 +226,7 @@
                      abs(ox) < w / 2 && !truncate ? -ox : sgn(ox) * w - ox,
                      abs(oy) < h / 2 && !truncate ? -oy : sgn(oy) * h - oy)
           if (!far)
-            settle && settle.call(this, ~~(px / w), ~~(py / h))
+            settle && settle.call(this, rnd(px / w), rnd(py / h))
           balance && balance.call(this, ox, oy)
         }
       }))
@@ -244,7 +244,7 @@
       }
 
       this.slot = function () {
-        return [~~((px + spring.dx) / w), ~~((py + spring.dy) / h)]
+        return [rnd((px + spring.dx) / w), rnd((py + spring.dy) / h)]
       }
     }),
 
