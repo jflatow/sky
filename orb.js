@@ -1,6 +1,7 @@
 (function () {
-  var def = Sky.util.def, clip = Sky.util.clip;
-  var pop = Sky.util.pop, up = Sky.util.update;
+  var U = Sky.util;
+  var def = U.def, fnt = U.fnt, clip = U.clip;
+  var pop = U.pop, up = U.update;
   var abs = Math.abs, log = Math.log, E = Math.E, Inf = Infinity;
   var sgn = function (x) { return x < 0 ? -1 : 1 }
   var cat = function (a, b) { return b ? [].concat(a, b) : a }
@@ -165,23 +166,6 @@
       return new Orb(obj, jack, this)
     },
 
-    crank: Orb.type(function Crank(elem, jack, opts) {
-      var opts = up({}, opts)
-      var cx = opts.cx || 0, cy = opts.cy || 0;
-
-      this.elem = elem;
-      this.jack = jack;
-      this.move = function (dx, dy, px, py) {
-        var c = elem.point(cx, cy).matrixTransform(elem.node.getScreenCTM())
-        var rx = px - c.x, ry = py - c.y;
-        if (rx > 0)
-          dy = -dy;
-        if (ry < 0)
-          dx = -dx;
-        return this.push(dx + dy, 0, this)
-      }
-    }),
-
     spring: Orb.type(function Spring(elem, jack, opts) {
       var opts = up({}, opts)
       var lock = opts.lock;
@@ -227,11 +211,12 @@
     guide: Orb.type(function Guide(elem, jack, opts) {
       var self = this;
       var opts = up({}, opts)
-      var lane = pop(opts, 'lane', {}), bbox = opts.bbox || elem.bbox()
-      var w = lane.width || bbox.width, h = lane.height || bbox.height;
+      var unit = pop(opts, 'unit', {}), bbox = opts.bbox || elem.bbox()
+      var w = unit.width || bbox.width, h = unit.height || bbox.height;
       var px = this.px = opts.px || 0, py = this.py || 0;
       var mx = opts.mx || 1e-3, my = opts.my || 1e-3, dist = Sun.clockdist;
-      var balance = opts.balance, truncate = pop(opts, 'truncate')
+      var balance = opts.balance
+      var settle = pop(opts, 'settle'), truncate = pop(opts, 'truncate')
       var spring = elem.spring(jack, up(opts, {
         balance: function () {
           var ox = w && px % w, oy = h && py % h;
@@ -241,7 +226,7 @@
                      abs(ox) < w / 2 && !truncate ? -ox : sgn(ox) * w - ox,
                      abs(oy) < h / 2 && !truncate ? -oy : sgn(oy) * h - oy)
           if (!far)
-            elem.trigger('settle', [~~(px / w), ~~(py / h)])
+            settle && settle.call(this, ~~(px / w), ~~(py / h))
           balance && balance.call(this, ox, oy)
         }
       }))
@@ -271,8 +256,8 @@
       var xmin, xmax, ymin, ymax;
       this.setBBox = function (bbox) {
         var b = self.bbox = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(b.x + b.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(b.y + b.height, Inf)
+        xmin = def(b.x, -Inf); xmax = def(xmin + b.width, Inf)
+        ymin = def(b.y, -Inf); ymax = def(ymin + b.height, Inf)
         if (px < xmin || px > xmax || py < ymin || py > ymax)
           self.goto(px < xmin ? xmin : (py > xmax ? xmax : px),
                     py < ymin ? ymin : (py > ymax ? ymax : py))
@@ -314,19 +299,36 @@
         return Orb.move(this, (x || 0) - (px + coil.dx), (y || 0) - (py + coil.dy))
       }
 
-      this.setBBox(opts.bbox || elem.bbox())
+      this.setBBox(opts.bbox)
     })
   })
 
   Sky.SVGElem.prototype.update({
+    crank: Orb.type(function Crank(elem, jack, opts) {
+      var opts = up({}, opts)
+      var cx = opts.cx || 0, cy = opts.cy || 0;
+
+      this.elem = elem;
+      this.jack = jack;
+      this.move = function (dx, dy, px, py) {
+        var c = elem.point(cx, cy).matrixTransform(elem.node.getScreenCTM())
+        var rx = px - c.x, ry = py - c.y;
+        if (rx > 0)
+          dy = -dy;
+        if (ry < 0)
+          dx = -dx;
+        return this.push(dx + dy, 0, this)
+      }
+    }),
+
     dolly: Orb.type(function Dolly(elem, jack, opts) {
       var opts = up({}, opts)
       var vbox = opts.vbox || elem.bbox()
       var xmin, xmax, ymin, ymax;
       var setBBox = this.setBBox = function (bbox) {
         var b = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(b.x + b.width - vbox.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(b.y + b.height - vbox.height, Inf)
+        xmin = def(b.x, -Inf); xmax = def(xmin + b.width - vbox.width, Inf)
+        ymin = def(b.y, -Inf); ymax = def(ymin + b.height - vbox.height, Inf)
       }
       setBBox(opts.bbox)
 
@@ -342,20 +344,23 @@
     }),
     wagon: Orb.type(function Wagon(elem, jack, opts) {
       var opts = up({}, opts)
-      var xmin, xmax, ymin, ymax;
+      var xmin, xmax, ymin, ymax, wide, high;
       var setBBox = this.setBBox = function (bbox) {
         var b = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(b.x + b.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(b.y + b.height, Inf)
+        xmin = def(b.x, -Inf); xmax = def(xmin + b.width, Inf)
+        ymin = def(b.y, -Inf); ymax = def(ymin + b.height, Inf)
+        wide = xmax - xmin; high = ymax - ymin;
       }
       setBBox(opts.bbox)
 
       this.elem = elem;
       this.jack = jack;
       this.move = function (dx, dy) {
-        var cur = elem.transformation(), off = cur.translate || [0, 0]
-        cur.translate = [clip(off[0] + dx, xmin, xmax),
-                         clip(off[1] + dy, ymin, ymax)]
+        var cur = elem.transformation(), off = cur.translate = cur.translate || [0, 0]
+        if (wide)
+          cur.translate[0] = clip(off[0] + dx, xmin, xmax)
+        if (high)
+          cur.translate[1] = clip(off[1] + dy, ymin, ymax)
         elem.transform(this.push(dx, dy, cur) || cur)
       }
     }),
@@ -366,8 +371,8 @@
       var xmin, xmax, ymin, ymax, wide, high;
       var setBBox = this.setBBox = function (bbox) {
         var b = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(b.x + b.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(b.y + b.height, Inf)
+        xmin = def(b.x, -Inf); xmax = def(xmin + b.width, Inf)
+        ymin = def(b.y, -Inf); ymax = def(ymin + b.height, Inf)
         wide = xmax - xmin; high = ymax - ymin;
       }
       setBBox(opts.bbox)
@@ -376,7 +381,7 @@
       this.jack = jack;
       this.move = function (dx, dy, cur) {
         var off = cur.translate || [0, 0]
-        var ox = off[0], oy = off[1], lx = ox, ly = oy, over = true;
+        var ox = fnt(off[0], xmin), oy = fnt(off[1], ymin), lx = ox, ly = oy, over = true;
         while (over) {
           over = false;
           if (wide) {
@@ -401,6 +406,61 @@
         cur.translate = [ox, oy]
         return this.push(dx, dy, cur) || cur;
       }
+    }),
+
+    belt: Orb.type(function Belt(elem, jack, opts) {
+      var self = this;
+      var opts = up({h: true, v: true}, opts)
+      var wbox = up(opts.h ? {} : {width: 0}, opts.v ? {} : {height: 0})
+      var bbox = opts.bbox || elem.bbox()
+      var draw = opts.draw;
+      var orbs = [].concat(jack), n = orbs.length;
+      this.elem = elem;
+      this.jack = orbs.map(function (o, k) {
+        var e = o.elem;
+        return e.wagon(e.loop(o, {
+          bbox: bbox,
+          wrap: function (wx, wy) {
+            var k_ = k;
+            if (draw && draw.call(self, o, k += n * (wx + wy), wx, wy))
+              return k = k_, true;
+          }
+        }), {bbox: wbox})
+      }, [])
+    }),
+
+    treadmill: Orb.type(function Treadmill(elem, jack, opts) {
+      var self = this;
+      var opts = up({h: true, v: true}, opts)
+      var draw = opts.draw;
+      var init = opts.init || function (o) { return o }
+      var soln = Sky.Box.solve(up({bbox: opts.dims}, opts))
+      var dims = soln.bbox;
+      var bbox = soln.bbox, unit = soln.unit, shape = soln.shape;
+      var rows = Math.ceil(shape.rows), cols = Math.ceil(shape.cols)
+
+      if (opts.h) {
+        shape.cols = cols + 1;
+        bbox = Sky.Box.solve({unit: unit, shape: shape}).bbox.shift(1 - unit.w, 0)
+      }
+      if (opts.v) {
+        shape.rows = rows + 1;
+        bbox = Sky.Box.solve({unit: unit, shape: shape}).bbox.shift(0, 1 - unit.h)
+      }
+
+      var orbs = unit.stack(function (a, b, i, j, k) {
+        var o = init.call(self, {elem: elem.g().shift(b.x, b.y), dims: b.copy({x: 0, y: 0})}, k)
+        var d = draw && draw.call(self, o, k)
+        return a.push(o), a;
+      }, [], shape)
+
+      this.dims = dims;
+      this.elem = elem;
+      this.jack = elem.belt(cat(orbs, jack), up(up({}, opts), {bbox: bbox}))
+      this.bbox = bbox;
+      this.unit = unit;
+      this.rows = rows;
+      this.cols = cols;
     })
   })
 })();

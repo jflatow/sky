@@ -1,6 +1,7 @@
 (function () {
   var min = Math.min, max = Math.max;
   var def = function (x, d) { return isNaN(x) ? d : x }
+  var fnt = function (x, d) { return isFinite(x) ? x : d }
   var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
   var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
   var pre = function (a, k, d) { return a[k] = get(a, k, d) }
@@ -12,6 +13,7 @@
   var anim = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
   var util = {
     def: def,
+    fnt: fnt,
     get: get,
     pop: pop,
     pre: pre,
@@ -140,9 +142,23 @@
       }, this)
       return new Box({x: bnds.x, y: bnds.y, w: bnds.right - bnds.x, h: bnds.bottom - bnds.y})
     },
+    tile: function (fun, acc, opts) {
+      return this.grid(fun, acc, this.count(opts && opts.unit))
+    },
     stack: function (fun, acc, opts) {
-      var o = up({rows: 1, cols: 1}, opts)
-      return this.copy({w: o.cols * this.w, h: o.rows * this.h}).grid(fun, acc, o)
+      return this.times(opts).grid(fun, acc, opts)
+    },
+    count: function (box) {
+      var u = box || this;
+      return {rows: this.h / u.h, cols: this.w / u.w}
+    },
+    times: function (shape) {
+      var s = up({rows: 1, cols: 1}, shape)
+      return this.copy({w: s.cols * this.w, h: s.rows * this.h})
+    },
+    over: function (shape) {
+      var s = up({rows: 1, cols: 1}, shape)
+      return this.copy({w: this.w / s.cols, h: this.h / s.rows})
     },
     split: function (opts) {
       return this.grid(function (acc, box) { return acc.push(box), acc }, [], opts)
@@ -203,6 +219,15 @@
         return x == def(o.x, 0) && y == def(o.y, 0) && w == def(ow, 0) && h == def(oh, 0)
     },
     toString: function () { with (this) return x + ',' + y + ',' + w + ',' + h }
+  }
+  Box.solve = function (opts) {
+    var o = up({}, opts)
+    var b = o.bbox, s = o.shape, u = o.unit;
+    if (b && s)
+      return up(o, {shape: up({rows: 1, cols: 1}, s), unit: b.over(s)})
+    if (u && s)
+      return up(o, {shape: up({rows: 1, cols: 1}, s), bbox: u.times(s)})
+    return up(o, {shape: b.count(u), unit: u.copy({x: b.x, y: b.y})})
   }
 
   function RGB(d) { up(this, d) }
@@ -357,6 +382,13 @@
     txt: function (text) {
       return this.props({textContent: text})
     },
+    uid: function () {
+      var id = (new Date - 0) + Math.random() + ''
+      return this.attrs({id: id}), id;
+    },
+    url: function () {
+      return 'url(#' + (this.attr('id') || this.uid()) + ')';
+    },
     $: function (q) {
       var node = typeof(q) == 'string' ? this.node.querySelector(q) : q;
       if (node)
@@ -416,6 +448,12 @@
     },
     svg: function (attrs, props) {
       return this.child('svg', attrs, props)
+    },
+    mask: function (attrs, props) {
+      return this.child('mask', attrs, props)
+    },
+    clipPath: function (attrs, props) {
+      return this.child('clipPath', attrs, props)
     },
     icon: function (x, y, w, h, name) {
       return this.use(name).xywh(x, y, w, h)
