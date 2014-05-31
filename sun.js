@@ -327,7 +327,7 @@
       return t.getFullYear() + '/' + pad(t.getMonth() + 1) + '/' + pad(t.getDate())
     },
     timestamp: function (t) {
-      return pad(t.getHours()) + ':' + pad(t.getSeconds()) + ':' + pad(t.getMinutes())
+      return pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds())
     },
     stamp: function (t) { return T.datestamp(t) + ' ' + T.timestamp(t) },
     fromGregorian: function (s) { return new Date((s - 62167219200) * 1000) },
