@@ -461,6 +461,45 @@
       this.unit = unit;
       this.rows = rows;
       this.cols = cols;
+    }),
+
+    wheel: Orb.type(function Wheel(elem, jack, opts) {
+      var opts = up({kx: 2, ky: 2, rx: 3, ry: 3}, opts)
+      var kx = pop(opts, 'kx'), ky = pop(opts, 'ky'), settle = pop(opts, 'settle')
+      var rx = pop(opts, 'rx'), ry = pop(opts, 'ry')
+
+      var tmill = elem.treadmill(jack, opts)
+      var guide = elem.guide(tmill, {
+        kx: kx,
+        ky: ky,
+        unit: tmill.unit,
+        settle: function (x, y) { settle && settle(-x, -y) }
+      })
+      var tether = guide.hook = elem.tether(guide, {rx: rx, ry: ry})
+
+      this.dims = tmill.dims;
+      this.elem = elem;
+      this.jack = tether;
+      this.bbox = tmill.bbox;
+      this.unit = tmill.unit;
+      this.rows = tmill.rows;
+      this.cols = tmill.cols;
+      this.getActive = function () {
+        return guide.slot().map(function (x) { return -x })
+      }
+      this.setActive = function (x, y) {
+        return tether.goto(-x * tmill.unit.w, -y * tmill.unit.h)
+      }
+      this.setBounds = function (bounds) {
+        var s = up({rows: 1, cols: 1}, bounds)
+        var u = tmill.unit, c = ~~(tmill.cols / 2), r = ~~(tmill.rows / 2)
+        var b = u.times({cols: s.cols - 1, rows: s.rows - 1}).align(Sky.box(), 1, 1).shift(c * u.w, r * u.h)
+        tether.setBBox(b)
+      }
+
+      if (opts.bounds)
+        this.setBounds(opts.bounds)
+      this.setActive.apply(this, opts.active || [])
     })
   })
 })();
