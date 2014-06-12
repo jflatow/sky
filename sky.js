@@ -106,6 +106,10 @@
       var t = def(t, 1)
       return (P.arc(cx, cy, rx, ry, 360, 0, open) +
               P.arc(cx, cy, rx + t, ry + t, -360, 360))
+    },
+    wedge: function (cx, cy, rx, ry, len, off, open) {
+      var open = open || P.M;
+      return open([cx, cy]) + P.arc(cx, cy, rx, ry, len, off, P.L) + 'Z';
     }
   })
 
