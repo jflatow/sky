@@ -110,8 +110,8 @@
   })
 
   function Box(d) {
-    this.x = d.x || 0;
-    this.y = d.y || 0;
+    this.x = d.x || d.left || 0;
+    this.y = d.y || d.top || 0;
     this.w = d.w || d.width || 0;
     this.h = d.h || d.height || 0;
   }
@@ -397,6 +397,10 @@
         case Elem.prototype.xmlns:
         default: return new Elem(node)
         }
+    },
+
+    bbox: function () {
+      return new Box(this.node.getBoundingClientRect())
     }
   })
 

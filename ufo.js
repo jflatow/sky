@@ -86,6 +86,38 @@
     return Orb.type.apply(Orb, [].concat.call([cons, proto], args))
   }
 
+  var basic = {
+    frame: otype(function Frame(pkg, root, opts) {
+      Cage.call(this)
+      var opts = this.opts = up({}, opts)
+      var dims = this.dims = opts.dims || root.bbox()
+      var elem = this.elem = root.child('div', {class: 'frame'})
+      this.on('top', function (n, o) { o && o != n && o.elem.remove() })
+    }, new Cage, {
+      window: otype(function Window(frame, state, opts) {
+        var parent = this.parent = frame;
+        var opts = this.opts = up({}, opts)
+        var dims = this.dims = frame.dims;
+        var elem = this.elem = frame.elem.child('div', {class: 'window'})
+
+        var self = this;
+        var percent;
+        this.state = up(state, {win: this})
+        this.jack = elem.orb({
+          move: function (dx) {
+            if (percent = U.clip(percent + dx, 0, 100) == 100) {
+              state.nav.change('state', state)
+              frame.change('top', self)
+            }
+          }
+        })
+        if (!frame.top)
+          frame.change('top', this)
+        this.jack.move(percent = 0)
+      })
+    })
+  }
+
   var iOS7x = {
     frame: otype(function Frame(pkg, root, opts) {
       Cage.call(this)
@@ -235,6 +267,7 @@
   UFO = {
     Nav: Nav,
     type: otype,
+    basic: basic,
     iOS7x: iOS7x
   }
 })();
