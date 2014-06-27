@@ -110,6 +110,15 @@
     wedge: function (cx, cy, rx, ry, len, off, open) {
       var open = open || P.M;
       return open([cx, cy]) + P.arc(cx, cy, rx, ry, len, off, P.L) + 'Z';
+    },
+    snake: function (x1, y1, x2, y2, vh) {
+      if (vh) {
+        var my = (y1 + y2) / 2;
+        return P('C', x1, my, x2, my, x2, y2)
+      } else {
+        var mx = (x1 + x2) / 2;
+        return P('C', mx, y1, mx, y2, x2, y2)
+      }
     }
   })
 
