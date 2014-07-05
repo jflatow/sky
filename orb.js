@@ -1,10 +1,13 @@
 (function () {
   var U = Sky.util;
   var def = U.def, fnt = U.fnt, clip = U.clip;
-  var pop = U.pop, up = U.update;
-  var abs = Math.abs, log = Math.log, rnd = Math.round, E = Math.E, Inf = Infinity;
+  var pop = U.pop, up = U.update, ext = U.extend;
+  var abs = Math.abs, log = Math.log, rnd = Math.round, E = Math.E;
+  var min = Math.min, max = Math.max;
   var sgn = function (x) { return x < 0 ? -1 : 1 }
   var cat = function (a, b) { return b ? [].concat(a, b) : a }
+  var id = function (o) { return o }
+  var noop = function () {}
 
   var touch = 'ontouchstart' in window;
   var pointerdown = touch ? 'touchstart' : 'mousedown';
@@ -20,12 +23,14 @@
   Orb.prototype.update = function (obj) { return up(this, obj) }
   Orb.prototype.update({
     prop: function (f, a) { return Orb.do(this.jack, f, a) },
-    push: function () { return this.prop('move', arguments) },
     grab: function () { this.grip++; return this.prop('grab', arguments) },
     free: function () { this.grip--; return this.prop('free', arguments) },
     move: function () { return this.prop('move', arguments) },
+    push: function () { return this.prop('move', arguments) },
+    sync: function () { return this.prop('sync', arguments) },
     drag: function (f, a) { return Orb.drag(this, f, a) },
-    walk: function (f, a) { return Orb.walk(this, f, a) }
+    walk: function (f, a) { return Orb.walk(this, f, a) },
+    thru: function (o, a) { return Orb.thru(this, o, a) }
   })
   Orb = up(Orb, {
     do: function (o, f, a) {
@@ -45,14 +50,18 @@
     drag: function (o, f, a) {
       return Orb.grab(o), Orb.do(o, f, a), Orb.free(o), o;
     },
-    init: function (o) { Orb.call(o); return o },
     type: function (cons) {
       var proto = cons.prototype = new Orb;
       [].slice.call(arguments, 1).map(function (base) { up(proto, base) })
-      return function (a, r, g, s) { return Orb.init(new cons(this, a, r, g, s)) }
+      return function (a, r, g, s) { return new cons(this, a, r, g, s) }
     },
     walk: function (o, f, a) {
       return f.call(o, o.parent ? Orb.walk(o.parent, f, a) : a)
+    },
+    thru: function (o, p, a) {
+      return a.map(function (k) {
+        Object.defineProperty(o, k, {get: function () { return p[k] }})
+      })
     }
   })
 
@@ -166,24 +175,27 @@
       return new Orb(obj, jack, this)
     },
 
-    spring: Orb.type(function Spring(elem, jack, opts) {
-      var opts = up({}, opts)
-      var lock = opts.lock;
-      var kx = opts.kx || 8, ky = opts.ky || 8;
-      var lx = opts.lx || 1, ly = opts.ly || 1;
-      var tx = opts.tx || 1, ty = opts.ty || 1;
-      var restore = opts.restore || function (dx, dy, mx, my) {
-        if (lock && this.grip)
-          return;
-        if (mx > tx) dx /= kx * log(mx + 1)
-        if (my > ty) dy /= ky * log(my + 1)
-        this.dx -= dx;
-        this.dy -= dy;
-        return this.push(dx, dy, this)
+    amp: Orb.type(function Amp(elem, jack, opts) {
+      var ax, ay, kx, ky;
+      var pow = Sun.pow;
+      var opts = up({ax: 1, ay: 1, kx: 1, ky: 1}, opts)
+      this.elem = elem;
+      this.jack = jack;
+      this.move = function (dx, dy, a, r, g, s) {
+        this.push(kx * pow(dx, ax), ky * pow(dy, ay), a, r, g, s)
       }
-      var stretch = opts.stretch, balance = opts.balance, perturb = opts.perturb;
-      var anim;
 
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        ax = opts.ax; ay = opts.ay;
+        kx = opts.kx; ky = opts.ky;
+      }
+      this.setOpts(opts)
+    }),
+
+    spring: Orb.type(function Spring(elem, jack, opts) {
+      var lock, kx, ky, lx, ly, tx, ty, restore, stretch, balance, perturb, anim;
+      var opts = up({}, opts)
       this.dx = 0;
       this.dy = 0;
       this.elem = elem;
@@ -206,31 +218,35 @@
           })
         }
       }
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        lock = opts.lock;
+        kx = opts.kx || 8; ky = opts.ky || 8;
+        lx = opts.lx || 1; ly = opts.ly || 1;
+        tx = opts.tx || 1; ty = opts.ty || 1;
+        restore = opts.restore || function (dx, dy, mx, my) {
+          if (lock && this.grip)
+            return;
+          if (mx > tx) dx /= kx * log(mx + 1)
+          if (my > ty) dy /= ky * log(my + 1)
+          this.dx -= dx;
+          this.dy -= dy;
+          return this.push(dx, dy, this)
+        }
+        stretch = opts.stretch;
+        balance = opts.balance;
+        perturb = opts.perturb;
+      }
+      this.setOpts(opts)
     }),
 
     guide: Orb.type(function Guide(elem, jack, opts) {
-      var self = this;
+      var unit, bbox, w, h, px, py, mx, my, balance, settle, truncate;
+      var dist = Sun.clockdist;
       var opts = up({}, opts)
-      var unit = pop(opts, 'unit', {}), bbox = opts.bbox || elem.bbox()
-      var w = unit.width || bbox.width, h = unit.height || bbox.height;
-      var px = this.px = opts.px || 0, py = this.py || 0;
-      var mx = opts.mx || 1e-3, my = opts.my || 1e-3, dist = Sun.clockdist;
-      var balance = opts.balance
-      var settle = pop(opts, 'settle'), truncate = pop(opts, 'truncate')
-      var spring = elem.spring(jack, up(opts, {
-        balance: function () {
-          var ox = w && px % w, oy = h && py % h;
-          var far = dist(ox, 0, w) > mx || dist(oy, 0, h) > my;
-          if (far)
-            Orb.move(self.hook || self,
-                     abs(ox) < w / 2 && !truncate ? -ox : sgn(ox) * w - ox,
-                     abs(oy) < h / 2 && !truncate ? -oy : sgn(oy) * h - oy)
-          if (!far)
-            settle && settle.call(this, rnd(px / w), rnd(py / h))
-          balance && balance.call(this, ox, oy)
-        }
-      }))
-
+      var self = this;
+      var spring = elem.spring(jack)
       this.elem = elem;
       this.jack = spring;
       this.move = function (dx, dy) {
@@ -242,31 +258,49 @@
         var ox = px + spring.dx - (i || 0) * w, oy = py + spring.dy - (j || 0) * h;
         self.move(-ox, -oy)
       }
-
       this.slot = function () {
         return [rnd((px + spring.dx) / w), rnd((py + spring.dy) / h)]
       }
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        unit = pop(opts, 'unit', unit || {})
+        bbox = opts.bbox || elem.bbox()
+        w = def(unit.width, def(w, bbox.width))
+        h = def(unit.height, def(h, bbox.height))
+        px = self.px = opts.px || 0;
+        py = self.py = opts.py || 0;
+        mx = opts.mx || 1e-3;
+        my = opts.my || 1e-3;
+        balance = opts.balance;
+        settle = pop(opts, 'settle', settle)
+        truncate = pop(opts, 'truncate', truncate)
+        spring.setOpts(ext(opts, {
+          balance: function () {
+            var ox = w && px % w, oy = h && py % h;
+            var far = dist(ox, 0, w) > mx || dist(oy, 0, h) > my;
+            if (far)
+              Orb.move(self.hook || self,
+                       abs(ox) < w / 2 && !truncate ? -ox : sgn(ox) * w - ox,
+                       abs(oy) < h / 2 && !truncate ? -oy : sgn(oy) * h - oy)
+            if (!far)
+              settle && settle.call(this, rnd(px / (w || 1)), rnd(py / (h || 1)))
+            balance && balance.call(this, ox, oy)
+          }
+        }))
+      }
+      this.setOpts(opts)
     }),
 
     tether: Orb.type(function Tether(elem, jack, opts) {
-      var self = this;
+      var bbox, xmin, xmax, ymin, ymax, rx, ry, px, py;
       var opts = up({}, opts)
-      var rx = opts.rx || 1, ry = opts.ry || 1;
-      var px = this.px = opts.px || 0, py = this.py = opts.py || 0;
-      var xmin, xmax, ymin, ymax;
-      this.setBBox = function (bbox) {
-        var b = self.bbox = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(xmin + b.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(ymin + b.height, Inf)
-        if (px < xmin || px > xmax || py < ymin || py > ymax)
-          self.goto(px < xmin ? xmin : (py > xmax ? xmax : px),
-                    py < ymin ? ymin : (py > ymax ? ymax : py))
-      }
+      var self = this;
       var plug = elem.orb({
         move: function (dx, dy) {
           self.px = px += dx;
           self.py = py += dy;
-          return this.push(dx, dy)
+          return this.push(dx, dy, px, py, bbox)
         }
       }, jack)
       var coil = elem.spring(plug, {kx: 1, ky: 1, lx: -1, ly: -1, lock: true})
@@ -279,17 +313,17 @@
         var ox = nx - xmax, oy = ny - ymax;
         if (ux < 0 && dx < 0) {
           cx = (px < xmin ? dx : ux) / (rx * log(abs(coil.dx) + E))
-          ix = Math.min(dx - ux, 0)
+          ix = min(dx - ux, 0)
         } else if (ox > 0 && dx > 0) {
           cx = (px > xmax ? dx : ox) / (rx * log(abs(coil.dx) + E))
-          ix = Math.max(dx - ox, 0)
+          ix = max(dx - ox, 0)
         }
         if (uy < 0 && dy < 0) {
           cy = (py < ymin ? dy : uy) / (ry * log(abs(coil.dy) + E))
-          iy = Math.min(dy - uy, 0)
+          iy = min(dy - uy, 0)
         } else if (oy > 0 && dy > 0) {
           cy = (py > ymax ? dy : oy) / (ry * log(abs(coil.dy) + E))
-          iy = Math.max(dy - oy, 0)
+          iy = max(dy - oy, 0)
         }
         Orb.move(coil, cx, cy)
         return Orb.move(plug, cx + ix, cy + iy)
@@ -299,15 +333,27 @@
         return Orb.move(this, (x || 0) - (px + coil.dx), (y || 0) - (py + coil.dy))
       }
 
-      this.setBBox(opts.bbox)
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        bbox = new Sky.Box(opts.bbox || {}, true)
+        xmin = bbox.x; xmax = bbox.right;
+        ymin = bbox.y; ymax = bbox.bottom;
+        rx = opts.rx || 1;
+        ry = opts.ry || 1;
+        px = self.px = def(opts.px, px || 0)
+        py = self.py = def(opts.py, py || 0)
+        if (px < xmin || px > xmax || py < ymin || py > ymax)
+          self.goto(px < xmin ? xmin : (py > xmax ? xmax : px),
+                    py < ymin ? ymin : (py > ymax ? ymax : py))
+      }
+      this.setOpts(opts)
     })
   })
 
   Sky.SVGElem.prototype.update({
     crank: Orb.type(function Crank(elem, jack, opts) {
+      var cx, cy;
       var opts = up({}, opts)
-      var cx = opts.cx || 0, cy = opts.cy || 0;
-
       this.elem = elem;
       this.jack = jack;
       this.move = function (dx, dy, px, py) {
@@ -319,20 +365,19 @@
           dx = -dx;
         return this.push(dx + dy, 0, this)
       }
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        cx = opts.cx || 0;
+        cy = opts.cy || 0;
+      }
+      this.setOpts(opts)
     }),
 
     dolly: Orb.type(function Dolly(elem, jack, opts) {
+      var vbox, bbox, xmin, xmax, ymin, ymax;
       var opts = up({}, opts)
-      var vbox = opts.vbox || elem.bbox()
-      var xmin, xmax, ymin, ymax;
-      var setBBox = this.setBBox = function (bbox) {
-        var b = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(xmin + b.width - vbox.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(ymin + b.height - vbox.height, Inf)
-      }
-      setBBox(opts.bbox)
-
-      this.elem = elem.attrs({viewBox: [vbox.x, vbox.y, vbox.width, vbox.height]})
+      this.elem = elem;
       this.jack = jack;
       this.move = function (dx, dy) {
         var cur = elem.node.viewBox.baseVal;
@@ -341,18 +386,22 @@
                    cur.width, cur.height]
         elem.attrs({viewBox: this.push(dx, dy, dim) || dim})
       }
-    }),
-    wagon: Orb.type(function Wagon(elem, jack, opts) {
-      var opts = up({}, opts)
-      var xmin, xmax, ymin, ymax, wide, high;
-      var setBBox = this.setBBox = function (bbox) {
-        var b = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(xmin + b.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(ymin + b.height, Inf)
-        wide = xmax - xmin; high = ymax - ymin;
-      }
-      setBBox(opts.bbox)
 
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        vbox = new Sky.Box(opts.vbox || elem.bbox())
+        bbox = new Sky.Box(opts.bbox || {}, true)
+        bbox = bbox.trim(0, vbox.width, 0, vbox.height)
+        xmin = bbox.x; xmax = bbox.right;
+        ymin = bbox.y; ymax = bbox.bottom;
+        elem.attrs({viewBox: vbox})
+      }
+      this.setOpts(opts)
+    }),
+
+    wagon: Orb.type(function Wagon(elem, jack, opts) {
+      var bbox, xmin, xmax, ymin, ymax, wide, high;
+      var opts = up({}, opts)
       this.elem = elem;
       this.jack = jack;
       this.move = function (dx, dy) {
@@ -363,20 +412,20 @@
           cur.translate[1] = clip(off[1] + dy, ymin, ymax)
         elem.transform(this.push(dx, dy, cur) || cur)
       }
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        bbox = new Sky.Box(opts.bbox || {}, true)
+        xmin = bbox.x; xmax = bbox.right;
+        ymin = bbox.y; ymax = bbox.bottom;
+        wide = bbox.width; high = bbox.height;
+      }
+      this.setOpts(opts)
     }),
 
     loop: Orb.type(function Loop(elem, jack, opts) {
+      var bbox, xmin, xmax, ymin, ymax, wide, high, wrap;
       var opts = up({}, opts)
-      var wrap = opts.wrap || function () {}
-      var xmin, xmax, ymin, ymax, wide, high;
-      var setBBox = this.setBBox = function (bbox) {
-        var b = bbox || {}
-        xmin = def(b.x, -Inf); xmax = def(xmin + b.width, Inf)
-        ymin = def(b.y, -Inf); ymax = def(ymin + b.height, Inf)
-        wide = xmax - xmin; high = ymax - ymin;
-      }
-      setBBox(opts.bbox)
-
       this.elem = elem;
       this.jack = jack;
       this.move = function (dx, dy, cur) {
@@ -406,100 +455,152 @@
         cur.translate = [ox, oy]
         return this.push(dx, dy, cur) || cur;
       }
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        bbox = new Sky.Box(opts.bbox || {}, true)
+        xmin = bbox.x; xmax = bbox.right;
+        ymin = bbox.y; ymax = bbox.bottom;
+        wide = bbox.width; high = bbox.height;
+        wrap = opts.wrap || noop;
+      }
+      this.setOpts(opts)
     }),
 
     belt: Orb.type(function Belt(elem, jack, opts) {
-      var self = this;
+      var wbox, bbox, draw;
       var opts = up({h: true, v: true}, opts)
-      var wbox = up(opts.h ? {} : {width: 0}, opts.v ? {} : {height: 0})
-      var bbox = opts.bbox || elem.bbox()
-      var draw = opts.draw;
+      var self = this;
       var orbs = [].concat(jack), n = orbs.length;
       this.elem = elem;
       this.jack = orbs.map(function (o, k) {
-        var e = o.elem;
+        var e = o.elem; o.k = k;
         return e.wagon(e.loop(o, {
-          bbox: bbox,
           wrap: function (wx, wy) {
-            var k_ = k;
-            if (draw && draw.call(self, o, k += n * (wx + wy), wx, wy))
-              return k = k_, true;
+            var k_ = o.k;
+            if (draw.call(self, o, mapk(o.k += n * (wx + wy)), wx, wy))
+              return o.k = k_, true;
           }
-        }), {bbox: wbox})
+        }))
       }, [])
+
+      this.sync = function () {
+        orbs.map(function (o) { draw.call(self, o, mapk(o.k)) })
+      }
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        wbox = up(opts.h ? {} : {width: 0}, opts.v ? {} : {height: 0})
+        bbox = opts.bbox || elem.bbox()
+        draw = opts.draw || noop;
+        mapk = opts.mapk || id;
+        self.jack.map(function (w) {
+          w.setOpts({bbox: wbox})
+          w.jack.setOpts({bbox: bbox})
+        })
+      }
+      this.setOpts(opts)
     }),
 
     treadmill: Orb.type(function Treadmill(elem, jack, opts) {
-      var self = this;
+      var init, dims, soln, bbox, unit, shape, rows, cols;
       var opts = up({h: true, v: true}, opts)
-      var draw = opts.draw;
-      var init = opts.init || function (o) { return o }
-      var soln = Sky.Box.solve(up({bbox: opts.dims}, opts))
-      var dims = soln.bbox;
-      var bbox = soln.bbox, unit = soln.unit, shape = soln.shape;
-      var rows = Math.ceil(shape.rows), cols = Math.ceil(shape.cols)
-
-      if (opts.h) {
-        shape.cols = cols + 1;
-        bbox = Sky.Box.solve({unit: unit, shape: shape}).bbox.shift(1 - unit.w, 0)
-      }
-      if (opts.v) {
-        shape.rows = rows + 1;
-        bbox = Sky.Box.solve({unit: unit, shape: shape}).bbox.shift(0, 1 - unit.h)
-      }
-
-      var orbs = unit.stack(function (a, b, i, j, k) {
-        var o = init.call(self, {elem: elem.g().shift(b.x, b.y), dims: b.copy({x: 0, y: 0})}, k)
-        var d = draw && draw.call(self, o, k)
-        return a.push(o), a;
-      }, [], shape)
-
-      this.dims = dims;
+      var orbs = []
+      var self = this;
       this.elem = elem;
-      this.jack = elem.belt(cat(orbs, jack), up(up({}, opts), {bbox: bbox}))
-      this.bbox = bbox;
-      this.unit = unit;
-      this.rows = rows;
-      this.cols = cols;
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        init = opts.init || id;
+
+        if (soln = Sky.Box.solve(up({bbox: opts.dims}, opts)) || soln) {
+          dims = bbox = soln.bbox; unit = soln.unit; shape = soln.shape;
+          shape = {rows: rows = shape.rows, cols: cols = shape.cols}
+        } else {
+          dims = bbox = unit = elem.bbox()
+          shape = {rows: rows = 1, cols: cols = 1}
+        }
+
+        if (opts.h) {
+          shape.cols = Math.ceil(cols + 1)
+          bbox = Sky.Box.solve({unit: unit, shape: shape}).bbox.shift(1 - unit.w, 0)
+        }
+        if (opts.v) {
+          shape.rows = Math.ceil(rows + 1)
+          bbox = Sky.Box.solve({unit: unit, shape: shape}).bbox.shift(0, 1 - unit.h)
+        }
+
+        orbs.map(function (o) { o.elem.remove() })
+        orbs = unit.stack(function (a, b) {
+          var o = elem.g().shift(b.x, b.y).orb({dims: b.copy({x: 0, y: 0})})
+          return a.push(init.call(self, o) || o), a;
+        }, [], shape)
+
+        self.dims = dims;
+        self.bbox = bbox;
+        self.unit = unit;
+        self.rows = rows;
+        self.cols = cols;
+        self.jack = elem.belt(cat(orbs, jack), ext(opts, {bbox: bbox}))
+        self.sync()
+      }
+      this.setOpts(opts)
     }),
 
     wheel: Orb.type(function Wheel(elem, jack, opts) {
+      var kx, ky, rx, ry, gunit, settle, active, window, offset, range, zero, u, i;
       var opts = up({kx: 2, ky: 2, rx: 3, ry: 3}, opts)
-      var kx = pop(opts, 'kx'), ky = pop(opts, 'ky'), settle = pop(opts, 'settle')
-      var rx = pop(opts, 'rx'), ry = pop(opts, 'ry')
-
-      var tmill = elem.treadmill(jack, opts)
-      var guide = elem.guide(tmill, {
-        kx: kx,
-        ky: ky,
-        unit: tmill.unit,
-        settle: function (x, y) { settle && settle(-x, -y) }
-      })
-      var tether = guide.hook = elem.tether(guide, {rx: rx, ry: ry})
-
-      this.dims = tmill.dims;
+      var self = this;
+      var tmill = this.tmill = elem.treadmill(null)
+      var guide = this.guide = elem.guide(tmill)
+      var tether = guide.hook = elem.tether(cat(guide, jack))
+      this.thru(tmill, ['dims', 'bbox', 'unit', 'rows', 'cols'])
       this.elem = elem;
       this.jack = tether;
-      this.bbox = tmill.bbox;
-      this.unit = tmill.unit;
-      this.rows = tmill.rows;
-      this.cols = tmill.cols;
       this.getActive = function () {
-        return guide.slot().map(function (x) { return -x })
+        return guide.slot().map(function (v, i) { return -v })
       }
       this.setActive = function (x, y) {
-        return tether.goto(-x * tmill.unit.w, -y * tmill.unit.h)
-      }
-      this.setBounds = function (bounds) {
-        var s = up({rows: 1, cols: 1}, bounds)
-        var u = tmill.unit, c = ~~(tmill.cols / 2), r = ~~(tmill.rows / 2)
-        var b = u.times({cols: s.cols - 1, rows: s.rows - 1}).align(Sky.box(), 1, 1).shift(c * u.w, r * u.h)
-        tether.setBBox(b)
+        return tether.goto(-x * u.w, -y * u.h)
       }
 
-      if (opts.bounds)
-        this.setBounds(opts.bounds)
-      this.setActive.apply(this, opts.active || [])
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        kx = pop(opts, 'kx', kx)
+        ky = pop(opts, 'ky', ky)
+        rx = pop(opts, 'rx', rx)
+        ry = pop(opts, 'ry', ry)
+        gunit = pop(opts, 'gunit', gunit)
+        settle = pop(opts, 'settle', settle)
+        active = pop(opts, 'active', active)
+        window = pop(opts, 'window', window)
+        offset = pop(opts, 'offset', offset || [0, 0])
+        range = pop(opts, 'range', range)
+        zero = pop(opts, 'zero', zero || [0, 0])
+
+        tmill.setOpts(ext(opts, {mapk: function (k) { return k - i }}))
+        guide.setOpts({
+          kx: kx,
+          ky: ky,
+          unit: gunit || self.unit,
+          settle: function (x, y) { settle && settle(-x, -y) }
+        })
+
+        u = self.unit;
+        i = zero[0] * self.cols + zero[1]
+
+        if (range) {
+          var r = up({rows: 1, cols: 1}, range)
+          var w = up({rows: self.rows, cols: self.cols}, window)
+          var a = Sky.box(0, 0, offset[0] * u.w, offset[1] * u.h)
+          var b = u.times({cols: max(r.cols - w.cols, 0), rows: max(r.rows - w.rows, 0)}).align(a, 1, 1)
+          tether.setOpts({bbox: b, rx: rx, ry: ry, px: 0, py: 0})
+        }
+
+        self.setActive.apply(this, active || [])
+        self.sync()
+      }
+      this.setOpts(opts)
     })
   })
 })();

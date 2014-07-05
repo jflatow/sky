@@ -1,5 +1,6 @@
 (function () {
-  var min = Math.min, max = Math.max;
+  var min = Math.min, max = Math.max, Inf = Infinity;
+  var add = function (p, d) { return isFinite(d) ? p + d : d }
   var def = function (x, d) { return isNaN(x) ? d : x }
   var fnt = function (x, d) { return isFinite(x) ? x : d }
   var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
@@ -10,14 +11,17 @@
       a[k] = b[k]
     return a;
   }
+  var ext = function (a, b) { return up(Object.create(a), b) }
   var anim = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
   var util = {
+    add: add,
     def: def,
     fnt: fnt,
     get: get,
     pop: pop,
     pre: pre,
     update: up,
+    extend: ext,
     copy: function (b) { return up({}, b) },
     clip: function (x, m, M) { return min(max(x, m), M) },
     randInt: function (m, M) { return Math.round((M - m) * Math.random()) + m }
@@ -122,11 +126,11 @@
     }
   })
 
-  function Box(d) {
-    this.x = d.x || d.left || 0;
-    this.y = d.y || d.top || 0;
-    this.w = d.w || d.width || 0;
-    this.h = d.h || d.height || 0;
+  function Box(d, e) {
+    this.x = def(def(d.x, d.left), e ? -Inf : 0)
+    this.y = def(def(d.y, d.top), e ? -Inf : 0)
+    this.w = def(def(d.w, d.width), e ? Inf : 0)
+    this.h = def(def(d.h, d.height), e ? Inf : 0)
   }
   Box.prototype = {
     constructor: Box,
@@ -134,10 +138,10 @@
     get height() { return this.h },
     get left() { return this.x },
     get top() { return this.y },
-    get midX() { return this.x + this.w / 2 },
-    get midY() { return this.y + this.h / 2 },
-    get right() { return this.x + this.w },
-    get bottom() { return this.y + this.h },
+    get midX() { return add(this.x, this.w / 2) },
+    get midY() { return add(this.y, this.h / 2) },
+    get right() { return add(this.x, this.w) },
+    get bottom() { return add(this.y, this.h) },
     grid: function (fun, acc, opts) {
       var o = up({rows: 1, cols: 1}, opts)
       var r = o.rows, c = o.cols;
@@ -240,7 +244,8 @@
       return up(o, {shape: up({rows: 1, cols: 1}, s), unit: b.over(s)})
     if (u && s)
       return up(o, {shape: up({rows: 1, cols: 1}, s), bbox: u.times(s)})
-    return up(o, {shape: b.count(u), unit: u.copy({x: b.x, y: b.y})})
+    if (b && u)
+      return up(o, {shape: b.count(u), unit: u.copy({x: b.x, y: b.y})})
   }
 
   function RGB(d) { up(this, d) }

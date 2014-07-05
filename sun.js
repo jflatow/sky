@@ -10,6 +10,7 @@
   }
   var int = function (x) { return parseInt(x, 10) }
   var sgn = function (x) { return x < 0 ? -1 : 1 }
+  var pow = function (x, a) { return sgn(x) * Math.pow(Math.abs(x), a || 2) }
   var add = function (x, y) { return x + y }
   var max = function (x, y) { return x > y ? x : y }
   var min = function (x, y) { return x < y ? x : y }
@@ -46,6 +47,7 @@
     cls: cls,
     int: int,
     sgn: sgn,
+    pow: pow,
     add: add,
     max: max,
     min: min,
