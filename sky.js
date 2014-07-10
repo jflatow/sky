@@ -463,14 +463,28 @@
       return this.div(attrs, props)
     },
 
+    anchor: function (i, j) {
+      var a = i < 0 ? 'left' : (i > 0 ? 'right' : 'center')
+      var b = j < 0 ? 'top' : (j > 0 ? 'bottom' : 'middle')
+      return this.style({'text-align': a, 'vertical-align': b})
+    },
     bbox: function () {
       return new Box(this.node.getBoundingClientRect())
     },
     polar: function (r, a) {
       return [r * trig.cos(a), r * trig.sin(a)];
     },
+    xy: function (x, y, u) {
+      return this.style(Q({left: x, top: y}, u))
+    },
     xywh: function (x, y, w, h, u) {
       return this.style(Q({left: x, top: y, width: w, height: h}, u))
+    },
+    align: function (box, ax, ay) {
+      return this.place(Sky.box().align(box, ax, ay)).anchor(ax, ay)
+    },
+    place: function (box, u) {
+      return this.xy(box.x, box.y, u)
     },
     resize: function (box, u) {
       return this.xywh(box.x, box.y, box.w, box.h, u)
@@ -580,7 +594,7 @@
     circleX: function (box, p, big) {
       var o = big ? max : min;
       with (box || this.bbox())
-        return this.circle(box.midX, box.midY, def(p, 1) * o(w, h) / 2)
+        return this.circle(midX, midY, def(p, 1) * o(w, h) / 2)
     },
     ellipseX: function (box, px, py) {
       with (box || this.bbox())
@@ -599,8 +613,7 @@
         return this.rect(x, y, w, h)
     },
     textX: function (box, text, cx, cy) {
-      with (box || this.bbox())
-        return this.text(midX + (cx || 0) * w / 2, midY + (cy || 0) * h / 2, text).anchor(cx, cy)
+      return this.text(0, 0, text).align(box || this.bbox(), cx, cy)
     },
 
     anchor: function (i, j) {
@@ -619,6 +632,9 @@
     },
     href: function (href) {
       return this.attrs({href: href}, this.xlink)
+    },
+    xy: function (x, y) {
+      return this.attrs({x: x, y: y})
     },
     xywh: function (x, y, w, h) {
       return this.attrs({x: x, y: y, width: w, height: h})
