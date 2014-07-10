@@ -12,6 +12,7 @@
     return a;
   }
   var ext = function (a, b) { return up(Object.create(a), b) }
+  var map = function (a, f) { return a.map ? a.map(f) : f(a) }
   var anim = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
   var util = {
     add: add,
@@ -22,6 +23,7 @@
     pre: pre,
     update: up,
     extend: ext,
+    map: map,
     copy: function (b) { return up({}, b) },
     clip: function (x, m, M) { return min(max(x, m), M) },
     randInt: function (m, M) { return Math.round((M - m) * Math.random()) + m }
@@ -123,6 +125,37 @@
         var mx = (x1 + x2) / 2;
         return P('C', mx, y1, mx, y2, x2, y2)
       }
+    }
+  })
+
+  var units = function (o, u) {
+    var t = {}
+    for (var k in o)
+      t[k] = Q.unify(k, o[k], u)
+    return t;
+  }
+  var Q = up(units, {
+    defaults: {
+      top: 'px',
+      left: 'px',
+      right: 'px',
+      bottom: 'px',
+      width: 'px',
+      height: 'px',
+      translate: 'px',
+      rotate: 'deg',
+      skewX: 'deg',
+      skewY: 'deg',
+    },
+    unify: function (k, v, u) {
+      var u = u || Q.defaults, d = u[k] || '';
+      return map(v, function (x) { return isFinite(x) ? x + d : x })
+    },
+    strip: function (k, v, u) {
+      var u = u || Q.defaults, d = u[k], n = d && d.length;
+      if (d)
+        return map(v, function (x) { return x.substr(-n) == d ? parseFloat(x) : x })
+      return v;
     }
   })
 
@@ -417,8 +450,65 @@
         }
     },
 
+    svg: function (attrs, props) {
+      return (new SVGElem('svg', attrs, props)).addTo(this)
+    },
+    div: function (attrs, props) {
+      return this.child('div', attrs, props)
+    },
+    span: function (attrs, props) {
+      return this.child('span', attrs, props)
+    },
+    group: function (attrs, props) {
+      return this.div(attrs, props)
+    },
+
     bbox: function () {
       return new Box(this.node.getBoundingClientRect())
+    },
+    polar: function (r, a) {
+      return [r * trig.cos(a), r * trig.sin(a)];
+    },
+    xywh: function (x, y, w, h, u) {
+      return this.style(Q({left: x, top: y, width: w, height: h}, u))
+    },
+    resize: function (box, u) {
+      return this.xywh(box.x, box.y, box.w, box.h, u)
+    },
+    screen: function (x, y) {
+      return {x: x, y: y}
+    },
+    shift: function (dx, dy) {
+      var x = this.transformation(), t = x.translate = x.translate || [0, 0]
+      t[0] += dx || 0;
+      t[1] += dy || 0;
+      return this.transform(x)
+    },
+
+    transform: function (desc, u) {
+      var xform = []
+      for (var k in desc)
+        xform.push(k + '(' + Q.unify(k, [].concat(desc[k]), u).join(',') + ')')
+      xform = xform.join(' ')
+      return this.style({transform: xform,
+                         '-moz-transform': xform,
+                         '-ms-transform': xform,
+                         '-o-transform': xform,
+                         '-webkit-transform': xform})
+    },
+    transformation: function (val, u) {
+      var s = this.node.style, val = val ||
+        s['transform'] ||
+        s['-webkit-transform'] ||
+        s['-o-transform'] ||
+        s['-ms-transform'] ||
+        s['-moz-transform'] || '';
+      var m, p = /(\w+)\(([^\)]*)\)/g, tx = {}
+      while (m = p.exec(val)) {
+        var k = m[1], v = m[2].split(',')
+        tx[k] = Q.strip(k, v, u)
+      }
+      return tx;
     }
   })
 
@@ -468,9 +558,6 @@
     use: function (href) {
       return this.child('use').href(href)
     },
-    svg: function (attrs, props) {
-      return this.child('svg', attrs, props)
-    },
     mask: function (attrs, props) {
       return this.child('mask', attrs, props)
     },
@@ -482,6 +569,9 @@
     },
     label: function (x, y, text, i, j) {
       return this.text(x, y, text).anchor(i, j)
+    },
+    group: function (attrs, props) {
+      return this.g(attrs, props)
     },
 
     border: function (t, r, b, l, box) {
@@ -533,25 +623,16 @@
     xywh: function (x, y, w, h) {
       return this.attrs({x: x, y: y, width: w, height: h})
     },
-    resize: function (box) {
-      return this.xywh(box.x, box.y, box.w, box.h)
-    },
     point: function (x, y) {
       var p = this.enc().node.createSVGPoint()
       p.x = x;
       p.y = y;
       return p;
     },
-    polar: function (r, a) {
-      return [r * trig.cos(a), r * trig.sin(a)];
+    screen: function (x, y) {
+      return this.point(x, y).matrixTransform(this.node.getScreenCTM())
     },
 
-    shift: function (dx, dy) {
-      var x = this.transformation(), t = x.translate = x.translate || [0, 0]
-      t[0] += dx || 0;
-      t[1] += dy || 0;
-      return this.transform(x)
-    },
     transform: function (desc) {
       var xform = [];
       for (var k in desc)
@@ -582,6 +663,7 @@
   Sky = {
     util: util,
     path: path,
+    units: units,
     box: function (x, y, w, h) { return new Box({x: x, y: y, w: w, h: h}) },
     rgb: function (r, g, b, a) { return new RGB({r: r, g: g, b: b, a: a}) },
     elem: function (elem, attrs, props, doc) { return new Elem(elem, attrs, props, doc) },

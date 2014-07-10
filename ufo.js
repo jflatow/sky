@@ -123,7 +123,7 @@
       Cage.call(this)
       var opts = this.opts = up({}, opts)
       var dims = this.dims = Sky.box(0, 0, 200, 200 / opts.aspectRatio)
-      var elem = this.elem = new Sky.svg({viewBox: dims}).addTo(root)
+      var elem = this.elem = root.svg({viewBox: dims})
       this.on('top', function (n, o) { o && o != n && o.elem.remove() })
     }, new Cage, {
       window: otype(function Window(frame, state, opts) {

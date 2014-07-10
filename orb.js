@@ -347,17 +347,15 @@
                     py < ymin ? ymin : (py > ymax ? ymax : py))
       }
       this.setOpts(opts)
-    })
-  })
+    }),
 
-  Sky.SVGElem.prototype.update({
     crank: Orb.type(function Crank(elem, jack, opts) {
       var cx, cy;
       var opts = up({}, opts)
       this.elem = elem;
       this.jack = jack;
       this.move = function (dx, dy, px, py) {
-        var c = elem.point(cx, cy).matrixTransform(elem.node.getScreenCTM())
+        var c = elem.screen(cx, cy)
         var rx = px - c.x, ry = py - c.y;
         if (rx > 0)
           dy = -dy;
@@ -370,31 +368,6 @@
         opts = up(opts, o)
         cx = opts.cx || 0;
         cy = opts.cy || 0;
-      }
-      this.setOpts(opts)
-    }),
-
-    dolly: Orb.type(function Dolly(elem, jack, opts) {
-      var vbox, bbox, xmin, xmax, ymin, ymax;
-      var opts = up({}, opts)
-      this.elem = elem;
-      this.jack = jack;
-      this.move = function (dx, dy) {
-        var cur = elem.node.viewBox.baseVal;
-        var dim = [clip(cur.x - dx, xmin, xmax),
-                   clip(cur.y - dy, ymin, ymax),
-                   cur.width, cur.height]
-        elem.attrs({viewBox: this.push(dx, dy, dim) || dim})
-      }
-
-      this.setOpts = function (o) {
-        opts = up(opts, o)
-        vbox = new Sky.Box(opts.vbox || elem.bbox())
-        bbox = new Sky.Box(opts.bbox || {}, true)
-        bbox = bbox.trim(0, vbox.width, 0, vbox.height)
-        xmin = bbox.x; xmax = bbox.right;
-        ymin = bbox.y; ymax = bbox.bottom;
-        elem.attrs({viewBox: vbox})
       }
       this.setOpts(opts)
     }),
@@ -532,7 +505,7 @@
 
         orbs.map(function (o) { o.elem.remove() })
         orbs = unit.stack(function (a, b) {
-          var o = elem.g().shift(b.x, b.y).orb({dims: b.copy({x: 0, y: 0})})
+          var o = elem.group().shift(b.x, b.y).orb({dims: b.copy({x: 0, y: 0})})
           return a.push(init.call(self, o) || o), a;
         }, [], shape)
 
@@ -599,6 +572,33 @@
 
         self.setActive.apply(this, active || [])
         self.sync()
+      }
+      this.setOpts(opts)
+    })
+  })
+
+  Sky.SVGElem.prototype.update({
+    dolly: Orb.type(function Dolly(elem, jack, opts) {
+      var vbox, bbox, xmin, xmax, ymin, ymax;
+      var opts = up({}, opts)
+      this.elem = elem;
+      this.jack = jack;
+      this.move = function (dx, dy) {
+        var cur = elem.node.viewBox.baseVal;
+        var dim = [clip(cur.x - dx, xmin, xmax),
+                   clip(cur.y - dy, ymin, ymax),
+                   cur.width, cur.height]
+        elem.attrs({viewBox: this.push(dx, dy, dim) || dim})
+      }
+
+      this.setOpts = function (o) {
+        opts = up(opts, o)
+        vbox = new Sky.Box(opts.vbox || elem.bbox())
+        bbox = new Sky.Box(opts.bbox || {}, true)
+        bbox = bbox.trim(0, vbox.width, 0, vbox.height)
+        xmin = bbox.x; xmax = bbox.right;
+        ymin = bbox.y; ymax = bbox.bottom;
+        elem.attrs({viewBox: vbox})
       }
       this.setOpts(opts)
     })
