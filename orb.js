@@ -531,7 +531,7 @@
       this.elem = elem;
       this.jack = tether;
       this.getActive = function () {
-        return guide.slot().map(function (v, i) { return -v })
+        return guide.slot().map(function (v) { return -v })
       }
       this.setActive = function (x, y) {
         return tether.goto(-x * u.w, -y * u.h)

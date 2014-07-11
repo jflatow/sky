@@ -91,6 +91,12 @@
       return fun() || setTimeout(function () {
         fun() || setTimeout(arguments.callee, every)
       }, every)
+    },
+    throttle: function (fun, every, T) {
+      return function () {
+        clearTimeout(T)
+        T = setTimeout(fun.bind.apply(fun, L.concat(this, arguments)), every)
+      }
     }
   }
 
@@ -180,6 +186,7 @@
   var L = Sun.lists = {
     last: function (list, n) { return list[list.length - (n || 1)] },
     append: function (list, item) { return list.push(item) && list },
+    concat: function (item, list) { return [item].concat([].slice.call(list)) },
     drop: function (list, item) {
       var i = list.indexOf(item)
       if (i >= 0)
