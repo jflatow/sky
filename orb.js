@@ -567,7 +567,7 @@
           var w = up({rows: self.rows, cols: self.cols}, window)
           var a = Sky.box(0, 0, offset[0] * u.w, offset[1] * u.h)
           var b = u.times({cols: max(r.cols - w.cols, 0), rows: max(r.rows - w.rows, 0)}).align(a, 1, 1)
-          tether.setOpts({bbox: b, rx: rx, ry: ry, px: 0, py: 0})
+          tether.setOpts({bbox: Sky.box().join(b), rx: rx, ry: ry, px: 0, py: 0})
         }
 
         self.setActive.apply(this, active || [])
