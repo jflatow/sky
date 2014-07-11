@@ -560,7 +560,7 @@
         })
 
         u = self.unit;
-        i = zero[0] * self.cols + zero[1]
+        i = zero[0] + zero[1] * self.cols;
 
         if (range) {
           var r = up({rows: 1, cols: 1}, range)
