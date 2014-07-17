@@ -491,11 +491,17 @@
     link: function (href) {
       return this.child('a').href(href)
     },
+    para: function (text) {
+      return this.child('p').txt(text)
+    },
     div: function (attrs, props) {
       return this.child('div', attrs, props)
     },
     span: function (attrs, props) {
       return this.child('span', attrs, props)
+    },
+    form: function (attrs, props) {
+      return this.child('form', attrs, props)
     },
     input: function (attrs, props) {
       return this.child('input', attrs, props)
