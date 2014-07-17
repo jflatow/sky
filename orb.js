@@ -505,7 +505,7 @@
 
         orbs.map(function (o) { o.elem.remove() })
         orbs = unit.stack(function (a, b) {
-          var o = elem.group().shift(b.x, b.y).orb({dims: b.copy({x: 0, y: 0})})
+          var o = elem.g().shift(b.x, b.y).orb({dims: b.copy({x: 0, y: 0})})
           return a.push(init.call(self, o) || o), a;
         }, [], shape)
 

@@ -1,13 +1,19 @@
 (function () {
   var P = Sky.path, U = Sky.util, up = Sun.up, Cage = Sun.Cage;
 
-  up(Sky.SVGElem.prototype, {
+  Sky.Elem.prototype.update({
     button: function (fun, opts, jack) {
-      return this.g({cursor: 'pointer'}).tap(fun, opts, jack)
+      return this.g({class: 'button'}).tap(fun, opts, jack)
     },
+    chevron: function (cx, cy, w, h, t) {
+      var box = Sky.box(0, 0, Math.abs(w), Math.abs(h || 2 * w))
+      return this.svgX(box.center(cx, cy)).chevron(cx, cy, w, h, t)
+    }
+  })
 
-    chevron: function (cx, cy, w, h) {
-      return this.path(P.chevron(cx, cy, w, h)).attrs({fill: 'none', 'stroke-width': 1.5})
+  Sky.SVGElem.prototype.update({
+    chevron: function (cx, cy, w, h, t) {
+      return this.path(P.chevron(cx, cy, w, h, t)).addClass('chevron')
     }
   })
 
@@ -75,67 +81,31 @@
     }
   })
 
-  var proto = {
-    theme: function (base) {
-      return this.walk(function (acc) { return up(acc, this.opts.theme) }, base || {})
-    }
-  }
-
-  var otype = function (cons) {
-    var args = [].slice.call(arguments, 1)
-    return Orb.type.apply(Orb, [].concat.call([cons, proto], args))
-  }
-
-  var basic = {
-    frame: otype(function Frame(pkg, root, opts) {
-      Cage.call(this)
-      var opts = this.opts = up({}, opts)
-      var dims = this.dims = opts.dims || root.bbox()
-      var elem = this.elem = root.child('div', {class: 'frame'})
-      this.on('top', function (n, o) { o && o != n && o.elem.remove() })
-    }, new Cage, {
-      window: otype(function Window(frame, state, opts) {
-        var parent = this.parent = frame;
-        var opts = this.opts = up({}, opts)
-        var dims = this.dims = frame.dims;
-        var elem = this.elem = frame.elem.child('div', {class: 'window'})
-
-        var self = this;
-        var percent;
-        this.state = up(state, {win: this})
-        this.jack = elem.orb({
-          move: function (dx) {
-            if (percent = U.clip(percent + dx, 0, 100) == 100) {
-              state.nav.change('state', state)
-              frame.change('top', self)
-            }
-          }
-        })
-        if (!frame.top)
-          frame.change('top', this)
-        this.jack.move(percent = 0)
-      })
-    })
-  }
-
+  var otype = Orb.type;
   var iOS7x = {
     frame: otype(function Frame(pkg, root, opts) {
+      var opts = up({}, opts)
+      var self = this;
+      var elem = this.elem = root.g({class: 'frame'})
       Cage.call(this)
-      var opts = this.opts = up({}, opts)
-      var dims = this.dims = Sky.box(0, 0, 200, 200 / opts.aspectRatio)
-      var elem = this.elem = root.svg({viewBox: dims})
       this.on('top', function (n, o) { o && o != n && o.elem.remove() })
+      this.setOpts = function (o) {
+        self.opts = up(opts, o)
+        self.dims = opts.dims || elem.bbox()
+        self.line = opts.line || self.dims.copy({h: 20})
+        self.top && self.top.state.nav.redraw(self.top)
+      }
+      this.setOpts(opts)
     }, new Cage, {
       window: otype(function Window(frame, state, opts) {
-        var parent = this.parent = frame;
-        var opts = this.opts = up({}, opts)
-        var dims = this.dims = frame.dims;
-        var elem = this.elem = frame.elem.g()
-        var content = this.content = elem.g()
-        var chrome = this.chrome = elem.g()
+        var opts = up({}, opts)
+        var self = this; this.frame = frame;
+        var elem = this.elem = frame.elem.g({class: 'window'})
+        var content = this.content = elem.g({class: 'content'})
+        var chrome = this.chrome = elem.g({class: 'chrome'})
 
-        var self = this;
         var xfer, percent;
+        this.thru(frame, ['dims', 'line'])
         this.state = up(state, {win: this})
         this.jack = elem.spring(elem.orb({
           move: function (dx) { xfer.call(this, percent = U.clip(percent + dx, 0, 100)) }
@@ -155,56 +125,61 @@
           }
         })
 
-        switch (opts.transition) {
-        case 'same':
-          xfer = function (p) { this.push(0) }
-          break;
-        case 'next':
-          xfer = function (p) {
-            if (frame.top) {
-              frame.top.chrome.style({opacity: 1 - p / 100})
-              Orb.move(frame.top.plugs, -p / 100)
-            }
-            chrome.style({opacity: p / 100})
-            content.transform({translate: (1 - p / 100) * dims.w})
-            this.push(1 - p / 100)
-          }
-          break;
+        this.setOpts = function (o) {
+          self.opts = up(opts, o)
 
-        case 'prev':
-          elem.insert(0)
-          xfer = function (p) {
-            if (frame.top) {
-              frame.top.chrome.style({opacity: 1 - p / 100})
-              frame.top.content.transform({translate: p / 100 * dims.w})
-              Orb.move(frame.top.plugs, p / 100)
+          switch (opts.transition) {
+          case 'same':
+            xfer = function (p) { this.push(0) }
+            break;
+          case 'next':
+            xfer = function (p) {
+              if (frame.top) {
+                frame.top.chrome.style({opacity: 1 - p / 100})
+                Orb.move(frame.top.plugs, -p / 100)
+              }
+              chrome.style({opacity: p / 100})
+              content.transform({translate: (1 - p / 100) * self.dims.w})
+              this.push(1 - p / 100)
             }
-            chrome.style({opacity: p / 100})
-            this.push(p / 100 - 1)
-          }
-          break;
+            break;
 
-        case 'new':
-          xfer = function (p) {
-            elem.transform({translate: [0, (1 - p / 100) * dims.h]})
-            this.push(0, 1 - p / 100)
-          }
-          break;
-
-        case 'old':
-        default:
-          elem.insert(0)
-          xfer = function (p) {
-            if (frame.top) {
-              frame.top.elem.transform({translate: [0, p / 100 * dims.h]})
-              Orb.move(frame.top.plugs, 0, p / 100)
+          case 'prev':
+            elem.insert(0)
+            xfer = function (p) {
+              if (frame.top) {
+                frame.top.chrome.style({opacity: 1 - p / 100})
+                frame.top.content.transform({translate: p / 100 * self.dims.w})
+                Orb.move(frame.top.plugs, p / 100)
+              }
+              chrome.style({opacity: p / 100})
+              this.push(p / 100 - 1)
             }
+            break;
+
+          case 'new':
+            xfer = function (p) {
+              elem.transform({translate: [0, (1 - p / 100) * self.dims.h]})
+              this.push(0, 1 - p / 100)
+            }
+            break;
+
+          case 'old':
+          default:
+            elem.insert(0)
+            xfer = function (p) {
+              if (frame.top) {
+                frame.top.elem.transform({translate: [0, p / 100 * self.dims.h]})
+                Orb.move(frame.top.plugs, 0, p / 100)
+              }
+            }
+            break;
           }
-          break;
+          if (!frame.top)
+            frame.change('top', this)
+          xfer.call(this, percent = 0)
         }
-        if (!frame.top)
-          frame.change('top', this)
-        xfer.call(this, percent = 0)
+        this.setOpts(opts)
       }, {
         reset: function () {
           this.chrome.clear()
@@ -212,47 +187,44 @@
           this.plugs.splice(0, -1)
           return this;
         },
+
         background: otype(function Background(win, opts) {
-          var parent = this.parent = win;
           var opts = this.opts = up({}, opts)
           var dims = this.dims = win.dims;
-          var elem = this.elem = win.content.g()
-
-          var theme = this.theme({back: '#f8f8f8'})
-          var bgrd = elem.rectX(dims).attrs({fill: theme.back})
+          var elem = this.elem = win.content.g({class: 'background'})
+          var bgrd = this.bgrd = elem.rectX(dims)
         }),
         navbar: otype(function NavBar(win, opts) {
           var x, y, w, h, d = win.dims;
-          var parent = this.parent = win;
-          var opts = this.opts = up({height: 24}, opts)
-          var dims = this.dims = Sky.box(x = d.x, y = d.y, w = d.w, h = opts.height)
-          var elem = this.elem = win.chrome.g({'font-size': 10})
+          var opts = this.opts = up({}, opts)
+          var line = this.line = win.line, q = line.h / 4;
+          var dims = this.dims = Sky.box(x = d.x, y = d.y, w = d.w, h = 2 * line.h)
+          var elem = this.elem = win.chrome.g({class: 'navbar'})
 
           var m = dims.midY, b = dims.part([.3, .4, .3], true)
           var state = win.state, nav = state.nav, page = nav.pages[state.tag], prev = state.prev;
           var title = opts.title || page.title, left = opts.left, right = opts.right;
-          var theme = this.theme({link: 'blue', tint: '#f8f8f8', line: '#101010'})
 
-          var bgrd = this.bgrd = elem.rect(x, y, w, h).attrs({fill: theme.tint})
+          var bgrd = this.bgrd = elem.rect(x, y, w, h)
 
           if (left) {
-            var lbtn = this.lbtn = elem.button(function () { left.action() })
-            lbtn.label(x + 6, m, left.label, -1).attrs({fill: theme.link})
-            lbtn.rectX(b[0]).attrs({fill: theme.tint}).insert(0)
+            var lbtn = this.lbtn = elem.button(function () { left.action() }).addClass('left')
+            lbtn.label(x + 3 * q, m, left.label, -1)
+            lbtn.rectX(b[0]).insert(0)
           } else if (prev) {
-            var back = this.back = elem.button(function () { nav.action('back')(state.data) })
-            back.chevron(x + 6, m, -5).attrs({stroke: theme.link})
-            back.label(x + 12, m, nav.pages[prev.tag].title, -1).attrs({fill: theme.link})
-            back.rectX(b[0]).attrs({fill: theme.tint}).insert(0)
+            var back = this.back = elem.button(function () { nav.action('back')(state.data) }).addClass('back')
+            back.chevron(x + 3 * q, m, -2 * q)
+            back.label(x + 5 * q, m, nav.pages[prev.tag].title, -1)
+            back.rectX(b[0]).insert(0)
           }
           if (right) {
-            var rbtn = this.rbtn = elem.button(function () { right.action() })
-            rbtn.label(dims.right - 6, m, right.label, 1).attrs({fill: theme.link})
-            rbtn.rectX(b[2]).attrs({fill: theme.tint}).insert(0)
+            var rbtn = this.rbtn = elem.button(function () { right.action() }).addClass('right')
+            rbtn.label(dims.right - 3 * q, m, right.label, 1)
+            rbtn.rectX(b[2]).insert(0)
           }
 
-          var tbar = this.tbar = elem.label(dims.midX, m, title).attrs({'font-weight': 500})
-          var line = this.line = elem.border(0, 0, .1, 0).attrs({fill: theme.line})
+          var tbar = this.tbar = elem.g()
+          tbar.label(dims.midX, m, title).addClass('title')
 
           win.plugs.push({
             move: function (px) {
@@ -266,8 +238,6 @@
 
   UFO = {
     Nav: Nav,
-    type: otype,
-    basic: basic,
     iOS7x: iOS7x
   }
 })();

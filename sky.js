@@ -1,5 +1,5 @@
 (function () {
-  var min = Math.min, max = Math.max, Inf = Infinity;
+  var abs = Math.abs, min = Math.min, max = Math.max, Rt2 = Math.sqrt(2), Inf = Infinity;
   var add = function (p, d) { return isFinite(d) ? p + d : d }
   var def = function (x, d) { return isNaN(x) ? d : x }
   var fnt = function (x, d) { return isFinite(x) ? x : d }
@@ -14,6 +14,14 @@
   var ext = function (a, b) { return up(Object.create(a), b) }
   var map = function (a, f) { return a.map ? a.map(f) : f(a) }
   var anim = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
+  var wrap = function (node) {
+    if (node)
+      switch (node.namespaceURI) {
+      case SVGElem.prototype.xmlns: return new SVGElem(node)
+      case Elem.prototype.xmlns:
+      default: return new Elem(node)
+      }
+  }
   var util = {
     add: add,
     def: def,
@@ -24,6 +32,7 @@
     update: up,
     extend: ext,
     map: map,
+    wrap: wrap,
     copy: function (b) { return up({}, b) },
     clip: function (x, m, M) { return min(max(x, m), M) },
     randInt: function (m, M) { return Math.round((M - m) * Math.random()) + m }
@@ -74,11 +83,12 @@
         return open([x1, y1]) + P('h', cx - x1) + P('a', rx, ry, 0, 0, sd, dx, dy) + P('v', y2 - cy)
       }
     },
-    chevron: function (cx, cy, w, h, open) {
+    chevron: function (cx, cy, w, h, t, open) {
       var open = open || P.M;
       var h = def(h, 2 * w), g = h / 2;
-      var x = cx - w / 2, y = cy - g;
-      return open([x, y]) + P('l', w, g) + P('l', -w, g)
+      var t = def(t, w * Rt2 / 5), o = t / Rt2, z = t / abs(Math.sin(Math.atan2(g, w - o)))
+      var x = cx - w / 2, y = cy - g + o;
+      return open([x, y]) + P('l', o, -o) + P('l', w - o, g) + P('l', o - w, g) + P('l', -o, -o) + P('l', w - z, o - g) + 'z'
     },
     triangle: function (cx, cy, b, h, open) {
       var open = open || P.M;
@@ -94,7 +104,7 @@
       return (open([ix, iy]) +
               P('A',
                 rx, ry, 0,
-                Math.abs(len) > 180 ? 1 : 0,
+                abs(len) > 180 ? 1 : 0,
                 len > 0 ? 1 : 0,
                 fx, fy))
     },
@@ -146,6 +156,7 @@
       rotate: 'deg',
       skewX: 'deg',
       skewY: 'deg',
+      borderRadius: 'px',
     },
     unify: function (k, v, u) {
       var u = u || Q.defaults, d = u[k] || '';
@@ -308,6 +319,7 @@
     }
   })
 
+  function elem(e, a, p, d) { return new Elem(e, a, p, d) }
   function Elem(elem, attrs, props, doc) {
     this.node = elem && elem.nodeType ? elem : (doc || document).createElementNS(this.xmlns, elem)
     this.attrs(attrs)
@@ -321,7 +333,7 @@
       return (parent.node || parent).appendChild(this.node), this;
     },
     append: function (child) {
-      return child.addTo(this) && this;
+      return child.addTo(this), this;
     },
     child: function (elem, attrs, props) {
       return new this.constructor(elem, attrs, props).addTo(this)
@@ -332,6 +344,39 @@
         node.removeChild(node.firstChild)
       return this;
     },
+    insert: function (k) {
+      var n = this.node, p = n.parentNode;
+      p.insertBefore(n, p.childNodes[k])
+      return this;
+    },
+    remove: function () {
+      this.node.parentNode.removeChild(this.node)
+      return this;
+    },
+
+    $: function (q) {
+      return wrap(typeof(q) == 'string' ? this.node.querySelector(q) : q)
+    },
+    doc: function () {
+      return this.node.ownerDocument ? new Elem(this.node.ownerDocument) : this;
+    },
+    each: function (sel, fun, acc) {
+      return [].reduce.call(this.node.querySelectorAll(sel), fun, acc) || this;
+    },
+    parent: function () {
+      return wrap(this.node.parentNode)
+    },
+    root: function () {
+      for (var n = this.node; n.parentNode; n = n.parentNode) {}
+      return n;
+    },
+    attached: function (o) {
+      return this.root() == (o ? o.root() : this.doc().node)
+    },
+    detached: function (o) {
+      return !this.attached(o)
+    },
+
     attr: function (name, ns) {
       return this.node.getAttributeNS(ns || null, name)
     },
@@ -355,9 +400,35 @@
         this.node.style[k] = attrs[k];
       return this;
     },
+
     space: function (space) {
       return this.attrs({space: space}, this.xml)
     },
+    txt: function (text) {
+      return this.props({textContent: text})
+    },
+    uid: function () {
+      var id = (new Date - 0) + Math.random() + ''
+      return this.attrs({id: id}), id;
+    },
+    url: function () {
+      return 'url(#' + (this.attr('id') || this.uid()) + ')';
+    },
+
+    addClass: function (cls) {
+      return this.node.classList.add(cls), this;
+    },
+    hasClass: function (cls) {
+      return this.node.classList.contains(cls)
+    },
+    removeClass: function (cls) {
+      var node = this.node;
+      node.classList.remove(cls)
+      if (!node.classList.length)
+        node.removeAttribute('class')
+      return this;
+    },
+
     animate: function (fun, n) {
       var self = this, i = 0;
       anim(function () {
@@ -366,15 +437,11 @@
       })
       return this;
     },
-    remove: function () {
-      this.node.parentNode.removeChild(this.node)
-      return this;
+    bind: function (name) {
+      var fun = this[name]
+      return fun.bind.apply(fun, [this].concat([].slice.call(arguments, 1)))
     },
-    insert: function (k) {
-      var n = this.node, p = n.parentNode;
-      p.insertBefore(n, p.childNodes[k])
-      return this;
-    },
+
     on: function (types, fun, capture) {
       var node = this.node;
       types.split(/\s+/).map(function (type) {
@@ -410,48 +477,12 @@
           fun.apply(this, arguments)
       })
     },
-    bind: function (name) {
-      var fun = this[name]
-      return fun.bind.apply(fun, [this].concat([].slice.call(arguments, 1)))
-    },
-    each: function (sel, fun, acc) {
-      return [].reduce.call(this.node.querySelectorAll(sel), fun, acc) || this;
-    },
-    root: function () {
-      for (var n = this.node; n.parentNode; n = n.parentNode) {}
-      return n;
-    },
-    doc: function () {
-      return this.node.ownerDocument ? new Elem(this.node.ownerDocument) : this;
-    },
-    attached: function (o) {
-      return this.root() == (o ? o.root() : this.doc().node)
-    },
-    detached: function (o) {
-      return !this.attached(o)
-    },
-    txt: function (text) {
-      return this.props({textContent: text})
-    },
-    uid: function () {
-      var id = (new Date - 0) + Math.random() + ''
-      return this.attrs({id: id}), id;
-    },
-    url: function () {
-      return 'url(#' + (this.attr('id') || this.uid()) + ')';
-    },
-    $: function (q) {
-      var node = typeof(q) == 'string' ? this.node.querySelector(q) : q;
-      if (node)
-        switch (node.namespaceURI) {
-        case SVGElem.prototype.xmlns: return new SVGElem(node)
-        case Elem.prototype.xmlns:
-        default: return new Elem(node)
-        }
-    },
 
     svg: function (attrs, props) {
-      return (new SVGElem('svg', attrs, props)).addTo(this)
+      return svg(up({class: 'svg'}, attrs), props).addTo(this)
+    },
+    link: function (href) {
+      return this.child('a').href(href)
     },
     div: function (attrs, props) {
       return this.child('div', attrs, props)
@@ -459,20 +490,72 @@
     span: function (attrs, props) {
       return this.child('span', attrs, props)
     },
-    group: function (attrs, props) {
+    image: function (x, y, w, h, href, u) {
+      return this.child('img', {class: 'image'}).attrs({src: href}).xywh(x, y, w, h, u)
+    },
+    circle: function (cx, cy, r, u) {
+      return this.div({class: 'circle'}).xywh(cx - r, cy - r, 2 * r, 2 * r, u).style(Q({borderRadius: r}, u))
+    },
+    ellipse: function (cx, cy, rx, ry, u) {
+      return this.div({class: 'ellipse'}).xywh(cx - rx, cy - ry, 2 * rx, 2 * ry, u).style({borderRadius: Q.unify('borderRadius', [rx, ry], u).join(' / ')})
+    },
+    rect: function (x, y, w, h, u) {
+      return this.div({class: 'rect'}).xywh(x, y, w, h, u)
+    },
+    text: function (x, y, text, u) {
+      return this.span({class: 'text'}).xy(x, y, u).txt(text)
+    },
+    label: function (x, y, text, i, j, u) {
+      return this.text(x, y, text, u).anchor(i, j)
+    },
+    g: function (attrs, props) {
       return this.div(attrs, props)
+    },
+    icon: function (x, y, w, h, name, u) {
+      return this.svgX(Sky.box(x, y, w, h), u).attrs({class: 'icon'}).icon(x, y, w, h, name)
+    },
+
+    svgX: function (box, u) {
+      return this.svg({viewBox: box}).resize(box, u)
+    },
+    iconX: function (box, name, u) {
+      with (box || this.bbox())
+        return this.icon(x, y, w, h, name, u)
+    },
+    imageX: function (box, href, u) {
+      with (box || this.bbox())
+        return this.image(x, y, w, h, href, u)
+    },
+    circleX: function (box, p, big, u) {
+      var o = big ? max : min;
+      with (box || this.bbox())
+        return this.circle(midX, midY, def(p, 1) * o(w, h) / 2, u)
+    },
+    ellipseX: function (box, px, py, u) {
+      with (box || this.bbox())
+        return this.ellipse(midX, midY, def(px, 1) * w / 2, def(py, 1) * h / 2, u)
+    },
+    rectX: function (box, u) {
+      with (box || this.bbox())
+        return this.rect(x, y, w, h, u)
+    },
+    textX: function (box, text, ax, ay, u) {
+      return this.text(0, 0, text, u).align(box || this.bbox(), ax, ay)
     },
 
     anchor: function (i, j) {
-      var a = i < 0 ? 'left' : (i > 0 ? 'right' : 'center')
-      var b = j < 0 ? 'top' : (j > 0 ? 'bottom' : 'middle')
-      return this.style({'text-align': a, 'vertical-align': b})
+      var a = i < 0 ? 0 : (i > 0 ? -100 : -50)
+      var b = j < 0 ? 0 : (j > 0 ? -100 : -50)
+      return this.transform({translate: [a + '%', b + '%']})
     },
     bbox: function () {
       return new Box(this.node.getBoundingClientRect())
     },
     polar: function (r, a) {
       return [r * trig.cos(a), r * trig.sin(a)];
+    },
+    href: function (href) {
+      return this.attrs({href: href})
     },
     xy: function (x, y, u) {
       return this.style(Q({left: x, top: y}, u))
@@ -484,10 +567,10 @@
       return this.place(Sky.box().align(box, ax, ay)).anchor(ax, ay)
     },
     place: function (box, u) {
-      return this.xy(box.x, box.y, u)
+      return this.parent().xy.call(this, box.x, box.y, u)
     },
     resize: function (box, u) {
-      return this.xywh(box.x, box.y, box.w, box.h, u)
+      return this.parent().xywh.call(this, box.x, box.y, box.w, box.h, u)
     },
     screen: function (x, y) {
       return {x: x, y: y}
@@ -526,6 +609,7 @@
     }
   })
 
+  function svg(a, p, d) { return new SVGElem('svg', a, p, d) }
   function SVGElem() {
     Elem.apply(this, arguments)
   }
@@ -533,6 +617,9 @@
     constructor: SVGElem,
     xmlns: "http://www.w3.org/2000/svg",
     xlink: "http://www.w3.org/1999/xlink",
+    svg: function (attrs, props) {
+      return this.child('svg', attrs, props)
+    },
     circle: function (cx, cy, r) {
       return this.child('circle', {cx: cx, cy: cy, r: r})
     },
@@ -542,17 +629,8 @@
     line: function (x1, y1, x2, y2) {
       return this.child('line', {x1: x1, y1: y1, x2: x2, y2: y2})
     },
-    rect: function (x, y, w, h) {
-      return this.child('rect', {x: x, y: y, width: w, height: h})
-    },
     path: function (d) {
       return this.child('path', d && {d: d})
-    },
-    text: function (x, y, text) {
-      return this.child('text', {x: x, y: y}, {textContent: text})
-    },
-    tspan: function (text) {
-      return this.child('tspan', {}, {textContent: text})
     },
     polyline: function (points) {
       return this.child('polyline', {points: points})
@@ -560,14 +638,20 @@
     polygon: function (points) {
       return this.child('polygon', {points: points})
     },
+    rect: function (x, y, w, h) {
+      return this.child('rect', {x: x, y: y, width: w, height: h})
+    },
+    text: function (x, y, text) {
+      return this.child('text', {x: x, y: y}, {textContent: text})
+    },
+    tspan: function (text) {
+      return this.child('tspan', {}, {textContent: text})
+    },
     g: function (attrs, props) {
       return this.child('g', attrs, props)
     },
     image: function (x, y, w, h, href) {
       return this.child('image').href(href).xywh(x, y, w, h)
-    },
-    link: function (href) {
-      return this.child('a').href(href)
     },
     use: function (href) {
       return this.child('use').href(href)
@@ -581,39 +665,9 @@
     icon: function (x, y, w, h, name) {
       return this.use(name).xywh(x, y, w, h)
     },
-    label: function (x, y, text, i, j) {
-      return this.text(x, y, text).anchor(i, j)
-    },
-    group: function (attrs, props) {
-      return this.g(attrs, props)
-    },
 
     border: function (t, r, b, l, box) {
       return this.path(P.border(box || this.bbox(), t, r, b, l))
-    },
-    circleX: function (box, p, big) {
-      var o = big ? max : min;
-      with (box || this.bbox())
-        return this.circle(midX, midY, def(p, 1) * o(w, h) / 2)
-    },
-    ellipseX: function (box, px, py) {
-      with (box || this.bbox())
-        return this.ellipse(midX, midY, def(px, 1) * w / 2, def(py, 1) * h / 2)
-    },
-    imageX: function (box, href) {
-      with (box || this.bbox())
-        return this.image(x, y, w, h, href)
-    },
-    iconX: function (box, name) {
-      with (box || this.bbox())
-        return this.icon(x, y, w, h, name)
-    },
-    rectX: function (box) {
-      with (box || this.bbox())
-        return this.rect(x, y, w, h)
-    },
-    textX: function (box, text, cx, cy) {
-      return this.text(0, 0, text).align(box || this.bbox(), cx, cy)
     },
 
     anchor: function (i, j) {
@@ -677,14 +731,14 @@
   })
 
   Sky = {
+    $: function (q) { return new Elem(document).$(q) },
+    box: function (x, y, w, h) { return new Box({x: x, y: y, w: w, h: h}) },
+    rgb: function (r, g, b, a) { return new RGB({r: r, g: g, b: b, a: a}) },
+    elem: elem,
+    svg: svg,
     util: util,
     path: path,
     units: units,
-    box: function (x, y, w, h) { return new Box({x: x, y: y, w: w, h: h}) },
-    rgb: function (r, g, b, a) { return new RGB({r: r, g: g, b: b, a: a}) },
-    elem: function (elem, attrs, props, doc) { return new Elem(elem, attrs, props, doc) },
-    svg: function (attrs, props, doc) { return new SVGElem('svg', attrs, props, doc) },
-    $: function (q) { return new Elem(document).$(q) },
     Box: Box,
     RGB: RGB,
     Elem: Elem,
