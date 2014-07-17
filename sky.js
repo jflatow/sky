@@ -167,6 +167,9 @@
       if (d)
         return map(v, function (x) { return x.substr(-n) == d ? parseFloat(x) : x })
       return v;
+    },
+    calc: function (a, o) {
+      return 'calc(' + [].concat(a).join(' ' + (o || '-') + ' ') + ')'
     }
   })
 
@@ -428,6 +431,10 @@
         node.removeAttribute('class')
       return this;
     },
+    css: function (k) {
+      var css = getComputedStyle(this.node)
+      return k ? css[k] : css;
+    },
 
     animate: function (fun, n) {
       var self = this, i = 0;
@@ -490,6 +497,9 @@
     span: function (attrs, props) {
       return this.child('span', attrs, props)
     },
+    input: function (attrs, props) {
+      return this.child('input', attrs, props)
+    },
     image: function (x, y, w, h, href, u) {
       return this.child('img', {class: 'image'}).attrs({src: href}).xywh(x, y, w, h, u)
     },
@@ -549,7 +559,7 @@
       return this.transform({translate: [a + '%', b + '%']})
     },
     bbox: function () {
-      return new Box(this.node.getBoundingClientRect())
+      return (new Box(this.node.getBoundingClientRect())).shift(pageXOffset, pageYOffset)
     },
     polar: function (r, a) {
       return [r * trig.cos(a), r * trig.sin(a)];
