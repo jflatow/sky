@@ -12,7 +12,7 @@
     return a;
   }
   var ext = function (a, b) { return up(Object.create(a), b) }
-  var map = function (a, f) { return a.map ? a.map(f) : f(a) }
+  var map = function (a, f) { return a && a.map ? a.map(f) : f(a) }
   var anim = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
   var wrap = function (node) {
     if (node)
