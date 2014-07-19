@@ -425,14 +425,16 @@
     },
 
     addClass: function (cls) {
-      return this.node.classList.add(cls), this;
+      var node = this.node;
+      map(cls, function (c) { node.classList.add(c) })
+      return this;
     },
     hasClass: function (cls) {
       return this.node.classList.contains(cls)
     },
     removeClass: function (cls) {
       var node = this.node;
-      node.classList.remove(cls)
+      map(cls, function (c) { node.classList.remove(c) })
       if (!node.classList.length)
         node.removeAttribute('class')
       return this;
