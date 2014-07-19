@@ -168,6 +168,12 @@
         return map(v, function (x) { return x.substr(-n) == d ? parseFloat(x) : x })
       return v;
     },
+    each: function (ks, o, u) {
+      return map(ks, function (k) { return Q.unify(k, o[k], u) })
+    },
+    rect: function (b, u) {
+      return 'rect(' + Q.each(['top', 'right', 'bottom', 'left'], b, u) + ')'
+    },
     calc: function (a, o) {
       return 'calc(' + [].concat(a).join(' ' + (o || '-') + ' ') + ')'
     }
