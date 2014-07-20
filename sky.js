@@ -237,21 +237,24 @@
       var nx = (ax || 0) / 2, ny = (ay || 0) / 2, ox = nx + .5, oy = ny + .5;
       var x = box.midX + nx * box.w - ox * this.w;
       var y = box.midY + ny * box.h - oy * this.h;
-      return new Box({x: x, y: y, w: this.w, h: this.h})
+      return this.copy({x: x, y: y})
     },
     center: function (cx, cy) {
-      return new Box({x: cx - this.w / 2, y: cy - this.h / 2, w: this.w, h: this.h})
+      return this.copy({x: (cx || 0) - this.w / 2, y: (cy || 0) - this.h / 2})
+    },
+    xy: function (x, y) {
+      return this.copy({x: x || 0, y: y || 0})
     },
     scale: function (a, b) {
       var w = a * this.w, h = def(b, a) * this.h;
       return new Box({x: this.midX - w / 2, y: this.midY - h / 2, w: w, h: h})
     },
     shift: function (dx, dy) {
-      return new Box({x: this.x + (dx || 0), y: this.y + (dy || 0), w: this.w, h: this.h})
+      return this.copy({x: this.x + (dx || 0), y: this.y + (dy || 0)})
     },
     square: function (big) {
       var o = big ? max : min, d = o(this.w, this.h)
-      return new Box({x: this.x, y: this.y, w: d, h: d})
+      return this.copy({w: d, h: d})
     },
     slice: function (ps, hzn) {
       var d = hzn ? this.w : this.h, ps = [].concat(ps)
