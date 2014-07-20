@@ -176,6 +176,9 @@
     },
     calc: function (a, o) {
       return 'calc(' + [].concat(a).join(' ' + (o || '-') + ' ') + ')'
+    },
+    url: function (a) {
+      return 'url(' + a + ')'
     }
   })
 
@@ -424,7 +427,7 @@
       return this.attrs({id: id}), id;
     },
     url: function () {
-      return 'url(#' + (this.attr('id') || this.uid()) + ')';
+      return Q.url('#' + (this.attr('id') || this.uid()))
     },
 
     addClass: function (cls) {
