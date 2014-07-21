@@ -245,6 +245,12 @@
         return list[i] = rep;
       return list.push(rep) && rep;
     },
+    times: function (list, n) {
+      var l = []
+      for (var i = 0; i < n; i++)
+        l = l.concat(list)
+      return l;
+    },
     umerge: function (x, y, lt) {
       var lt = lt || function (a, b) { return a < b }
       var z = [], i = 0, j = 0, l;
