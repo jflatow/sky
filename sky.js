@@ -2,8 +2,9 @@
   var abs = Math.abs, min = Math.min, max = Math.max, Rt2 = Math.sqrt(2), Inf = Infinity;
   var add = function (p, d) { return isFinite(d) ? p + d : d }
   var def = function (x, d) { return isNaN(x) ? d : x }
+  var dfn = function (x, d) { return x == undefined ? d : x }
   var fnt = function (x, d) { return isFinite(x) ? x : d }
-  var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
+  var get = function (a, k, d) { var v = a[k]; return dfn(v, d) }
   var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
   var pre = function (a, k, d) { return a[k] = get(a, k, d) }
   var up = function (a, b) {
@@ -25,6 +26,7 @@
   var util = {
     add: add,
     def: def,
+    dfn: dfn,
     fnt: fnt,
     get: get,
     pop: pop,
@@ -593,8 +595,8 @@
     xywh: function (x, y, w, h, u) {
       return this.style(Q({left: x, top: y, width: w, height: h}, u))
     },
-    align: function (box, ax, ay) {
-      return this.place(Sky.box().align(box, ax, ay)).anchor(ax, ay)
+    align: function (box, ax, ay, u) {
+      return this.place(Sky.box().align(box, ax, ay), u).anchor(ax, ay)
     },
     place: function (box, u) {
       return this.parent().xy.call(this, box.x, box.y, u)
