@@ -93,6 +93,7 @@
         }
       }, jack), {stop: opts.stop})
     },
+
     dbltap: function (fun, opts) {
       var opts = up({gap: 250}, opts)
       var self= this, taps = 0;
@@ -127,6 +128,7 @@
       })
       return this;
     },
+
     swipe: function (o, opts) {
       var opts = up({glob: true}, opts)
       var swipe = 0, lx, ly;
@@ -143,7 +145,7 @@
       that.on(pointermove, function (e) {
         if (swipe) {
           var t = e.touches ? e.touches[0] : e;
-          Orb.move(o, t.pageX - lx, t.pageY - ly, lx, ly, t.pageX, t.pageY)
+          Orb.move(o, t.pageX - lx, t.pageY - ly, lx, ly, e)
           lx = t.pageX;
           ly = t.pageY;
           if (opts.stop)
@@ -160,10 +162,14 @@
       })
       return this;
     },
+
     scroll: function (o, opts) {
       var opts = up({prevent: true}, opts)
+      var lx, ly;
       return this.on('mousewheel', function (e) {
-        Orb.move(o, e.wheelDeltaX, e.wheelDeltaY)
+        Orb.move(o, e.wheelDeltaX, e.wheelDeltaY, lx, ly, e)
+        lx = e.pageX;
+        ly = e.pageY;
         if (opts.stop)
           e.stopImmediatePropagation()
         if (opts.prevent)
@@ -505,7 +511,7 @@
 
         orbs.map(function (o) { o.elem.remove() })
         orbs = unit.stack(function (a, b) {
-          var o = elem.g().shift(b.x, b.y).orb({dims: b.copy({x: 0, y: 0})})
+          var o = elem.g().shift(b.x, b.y).orb({dims: b.xy()})
           return a.push(init.call(self, o) || o), a;
         }, [], shape)
 
