@@ -84,7 +84,7 @@
   var otype = Orb.type;
   var iOS7x = {
     frame: otype(function Frame(pkg, root, opts) {
-      var opts = up({}, opts)
+      var opts = up({kx: 1.5}, opts)
       var self = this;
       var elem = this.elem = root.g({class: 'frame'})
       Cage.call(this)
@@ -98,7 +98,7 @@
       this.setOpts(opts)
     }, new Cage, {
       window: otype(function Window(frame, state, opts) {
-        var opts = up({}, opts)
+        var opts = up({kx: frame.opts.kx}, opts)
         var self = this; this.frame = frame;
         var elem = this.elem = frame.elem.g({class: 'window'})
         var content = this.content = elem.g({class: 'content'})
@@ -110,7 +110,7 @@
         this.jack = elem.spring(elem.orb({
           move: function (dx) { xfer.call(this, percent = U.clip(percent + dx, 0, 100)) }
         }, this.plugs = []), {
-          kx: 2,
+          kx: opts.kx,
           balance: function () {
             if (percent >= 50) {
               if (percent < 100)
