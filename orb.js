@@ -109,41 +109,32 @@
 
     press: function (o, opts) {
       var opts = up({gain: 1, every: 1}, opts)
-      var press, i;
-      this.on(pointerdown, function (e) {
-        if (!press)
-          Orb.grab(o, e)
-        press = true;
+      var i, doc = this.doc()
+      return this.on(pointerdown, function (e) {
+        Orb.grab(o, e)
         i = setInterval(function () { Orb.move(o, opts.gain) }, opts.every)
         if (opts.prevent)
           e.preventDefault()
-      })
-      this.doc().on(pointerup, function (e) {
-        if (press)
+        doc.once(pointerup, function (e) {
           Orb.free(o, e)
-        press = false;
-        clearInterval(i)
-        if (opts.prevent)
-          e.preventDefault()
+          clearInterval(i)
+          if (opts.prevent)
+            e.preventDefault()
+        })
       })
-      return this;
     },
 
     swipe: function (o, opts) {
       var opts = up({glob: true}, opts)
-      var swipe = 0, lx, ly;
-      var doc = this.doc(), that = opts.glob ? doc : this;
+      var lx, ly, move, doc = this.doc(), that = opts.glob ? doc : this;
       this.on(pointerdown, function (e) {
         var t = e.touches ? e.touches[0] : e;
-        if (!swipe++)
-          Orb.grab(o, e)
+        Orb.grab(o, e)
         lx = t.pageX;
         ly = t.pageY;
         if (opts.prevent)
           e.preventDefault()
-      })
-      that.on(pointermove, function (e) {
-        if (swipe) {
+        that.on(pointermove, move = function (e) {
           var t = e.touches ? e.touches[0] : e;
           Orb.move(o, t.pageX - lx, t.pageY - ly, lx, ly, e)
           lx = t.pageX;
@@ -152,13 +143,13 @@
             e.stopImmediatePropagation()
           if (opts.prevent)
             e.preventDefault()
-        }
-      })
-      doc.on(pointerup, function (e) {
-        if (swipe && !--swipe)
+        })
+        doc.once(pointerup, function (e) {
+          that.off(pointermove, move)
           Orb.free(o, e)
-        if (opts.prevent)
-          e.preventDefault()
+          if (opts.prevent)
+            e.preventDefault()
+        })
       })
       return this;
     },
