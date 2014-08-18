@@ -192,9 +192,14 @@
       if (i >= 0)
         return list.splice(i, 1)[0]
     },
+    fold: function(list, fun, acc) {
+      for (var i = 0; i < list.length; i++)
+        acc = fun(acc, list[i], i, list)
+      return acc;
+    },
     groupby: function (list, key) {
       var k, key = key || function (item) { return item[0] }
-      return list.reduce(function (acc, item) {
+      return L.fold(list, function (acc, item) {
         var k_ = key(item)
         if (k_ == k)
           acc[acc.length - 1][1].push(item)
@@ -206,7 +211,7 @@
     },
     unique: function (list, key) {
       var keys = {}, key = key || function (item) { return item }
-      return list.reduce(function (acc, item) {
+      return L.fold(list, function (acc, item) {
         var k = key(item)
         if (k in keys)
           return acc;
