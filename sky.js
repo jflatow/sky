@@ -394,6 +394,8 @@
       return !this.attached(o)
     },
 
+    hide: function (b) { return this.attrs({hidden: b || b == undefined ? '' : null}) },
+    show: function (b) { return this.attrs({hidden: b || b == undefined ? null : ''}) },
     attr: function (name, ns) {
       return this.node.getAttributeNS(ns || null, name)
     },
