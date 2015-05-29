@@ -1,0 +1,12 @@
+{
+  "name": "sky",
+  "version": "0.1.0",
+  "license": "Artistic-2.0",
+  "author": "Jared Flatow",
+  "description": "A lightweight UI library",
+  "main": "sky.js",
+  "repository" : {
+    "type" : "git",
+    "url" : "https://github.com/jflatow/sky.git"
+  }
+}
