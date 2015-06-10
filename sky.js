@@ -355,18 +355,20 @@ Elem.prototype.update({
     return new this.constructor(elem, attrs, props).addTo(this)
   },
   clear: function () {
-    var node = this.node;
-    while (node.firstChild)
-      node.removeChild(node.firstChild)
+    var n = this.node;
+    while (n.firstChild)
+      n.removeChild(n.firstChild)
     return this;
   },
-  insert: function (k) {
+  order: function (k) {
     var n = this.node, p = n.parentNode;
     p.insertBefore(n, p.childNodes[k])
     return this;
   },
   remove: function () {
-    this.node.parentNode.removeChild(this.node)
+    var n = this.node, p = n.parentNode;
+    if (p)
+      p.removeChild(n)
     return this;
   },
 
@@ -391,6 +393,9 @@ Elem.prototype.update({
   },
   detached: function (o) {
     return !this.attached(o)
+  },
+  unique: function (q, fun) {
+    return this.$(q) || fun(this)
   },
 
   hide: function (b) { return this.attrs({hidden: b || b == undefined ? '' : null}) },
@@ -451,6 +456,16 @@ Elem.prototype.update({
   css: function (k) {
     var css = getComputedStyle(this.node)
     return k ? css[k] : css;
+  },
+  addRules: function (rules) {
+    var i = 0, sheet = this.node.sheet;
+    for (var selector in rules) {
+      var rule = rules[selector], str = ''
+      for (var property in rule)
+        str += property + ': ' + rule[property] + ';'
+      sheet.insertRule(selector + '{' + str + '}', i++)
+    }
+    return i;
   },
 
   animate: function (fun, n) {
@@ -544,16 +559,16 @@ Elem.prototype.update({
   g: function (attrs, props) {
     return this.div(attrs, props)
   },
-  icon: function (x, y, w, h, name, u) {
-    return this.svgX(Sky.box(x, y, w, h), u).attrs({class: 'icon'}).icon(x, y, w, h, name)
+  icon: function (x, y, w, h, href, u) {
+    return this.svgX(Sky.box(x, y, w, h), u).attrs({class: 'icon'}).icon(x, y, w, h, href)
   },
 
   svgX: function (box, u) {
     return this.svg({viewBox: box}).resize(box, u)
   },
-  iconX: function (box, name, u) {
+  iconX: function (box, href, u) {
     with (box || this.bbox())
-      return this.icon(x, y, w, h, name, u)
+      return this.icon(x, y, w, h, href, u)
   },
   imageX: function (box, href, u) {
     with (box || this.bbox())
@@ -695,8 +710,8 @@ SVGElem.prototype = new Elem().update({
   clipPath: function (attrs, props) {
     return this.child('clipPath', attrs, props)
   },
-  icon: function (x, y, w, h, name) {
-    return this.use(name).xywh(x, y, w, h)
+  icon: function (x, y, w, h, href) {
+    return this.use(href).xywh(x, y, w, h)
   },
 
   border: function (t, r, b, l, box) {
