@@ -54,14 +54,33 @@ Sun = module.exports = {
   pad: pad,
   nchoosek: nchoosek,
   bezier: bezier,
+
   clockdist: function (a, b, c) {
     return min(mod(a - b, c || 24), mod(b - a, c || 24))
   },
+
   ellipsis: function (text, n) {
     if (n && text.length > n + 3)
       return text.substr(0, n) + '\u2026';
     return text;
   },
+
+  equals: function (a, b) {
+    if (a || b) {
+      if (a && b) {
+        for (var k in a)
+          if (a[k] != b[k])
+            return false;
+        for (var k in b)
+          if (b[k] != a[k])
+            return false;
+        return true;
+      }
+      return false;
+    }
+    return true;
+  },
+
   count: function (fun, acc, opt) {
     var o = up({start: 0, step: 1, stop: isFinite(opt) ? opt : undefined}, opt)
     var f = o.start + o.step >= o.start;
@@ -80,12 +99,15 @@ Sun = module.exports = {
       acc = fun(acc, [k, obj[k]], i++, obj)
     return acc;
   },
+
   format: function (fmt, arg) {
     return fmt.replace(/{(.*?)}/g, function(m, k) { return k in arg ? arg[k] : m })
   },
+
   object: function (iter) {
     return Sun.fold(function (o, i) { return (o[i[0]] = i[1]), o }, {}, iter)
   },
+
   repeat: function (fun, every) {
     return fun() || setTimeout(function () {
       fun() || setTimeout(arguments.callee, every)
@@ -243,11 +265,11 @@ var L = Sun.lists = {
     if (i >= 0)
       return list[i];
   },
-  keystore: function (list, val, rep, key, eq) {
+  keystore: function (list, val, item, key, eq) {
     var i = L.keyindex(list, val, key, eq)
     if (i >= 0)
-      return list[i] = rep;
-    return list.push(rep) && rep;
+      return list[i] = item;
+    return list.push(item) && item;
   },
   times: function (list, n) {
     var l = []
