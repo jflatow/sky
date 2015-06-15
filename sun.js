@@ -104,6 +104,11 @@ Sun = module.exports = {
     return fmt.replace(/{(.*?)}/g, function(m, k) { return k in arg ? arg[k] : m })
   },
 
+  modify: function (obj, key, fun) {
+    obj[key] = fun(obj[key])
+    return obj;
+  },
+
   object: function (iter) {
     return Sun.fold(function (o, i) { return (o[i[0]] = i[1]), o }, {}, iter)
   },
