@@ -104,8 +104,20 @@ Sun = module.exports = {
     return fmt.replace(/{(.*?)}/g, function(m, k) { return k in arg ? arg[k] : m })
   },
 
+  lookup: function (obj, key) {
+    var path = key instanceof Array ? key : [key]
+    return path.reduce(function (acc, k) {
+      if (acc)
+        return acc[k]
+      return acc;
+    }, obj)
+  },
+
   modify: function (obj, key, fun) {
-    obj[key] = fun(obj[key])
+    var path = key instanceof Array ? key : [key]
+    var pen = Sun.lookup(obj, path.slice(0, -1)), k = L.last(path)
+    if (pen && path.length)
+      pen[k] = fun(pen[k])
     return obj;
   },
 
@@ -143,6 +155,7 @@ up(Sun.Cage.prototype, {
       this.change(k, obj[k])
     return this;
   },
+
   on: function (keys, fun) {
     var fns = this.__fns__, sep = this.__opt__.sep;
     keys.split(sep).map(function (k) { (fns[k] = fns[k] || []).push(fun) })
