@@ -104,6 +104,14 @@ Sun = module.exports = {
     return fmt.replace(/{(.*?)}/g, function(m, k) { return k in arg ? arg[k] : m })
   },
 
+  keyfun: function (key) {
+    if (key instanceof Function)
+      return key;
+    if (key == undefined)
+      return function (item) { return item }
+    return function (item) { return item[key] }
+  },
+
   lookup: function (obj, key) {
     var path = key instanceof Array ? key : [key]
     return path.reduce(function (acc, k) {
@@ -265,10 +273,12 @@ var L = Sun.lists = {
         return list.splice(i, 0, item) && list;
     return list.push(item) && list;
   },
+
   keyindex: function (list, val, key, eq) {
     var eq = eq || function (a, b) { return a <= b && a >= b }
-    for (var i = 0, k = key || 0; i < list.length; i++) {
-      var v = list[i][k];
+    var key = Sun.keyfun(key)
+    for (var i = 0; i < list.length; i++) {
+      var v = key(list[i])
       if (eq(v, val))
         return i;
     }
@@ -289,6 +299,7 @@ var L = Sun.lists = {
       return list[i] = item;
     return list.push(item) && item;
   },
+
   times: function (list, n) {
     var l = []
     for (var i = 0; i < n; i++)
