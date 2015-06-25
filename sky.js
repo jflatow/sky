@@ -361,8 +361,8 @@ Elem.prototype.update({
     return this;
   },
   order: function (k) {
-    var n = this.node, p = n.parentNode;
-    p.insertBefore(n, p.childNodes[k])
+    var n = this.node, p = n.parentNode, C = p.childNodes.length;
+    p.insertBefore(n, p.childNodes[util.clip(k < 0 ? C + k : k, 0, C)])
     return this;
   },
   remove: function () {
@@ -415,19 +415,21 @@ Elem.prototype.update({
   },
   props: function (props) {
     for (var k in props)
-      this.node[k] = props[k];
+      this.node[k] = props[k]
     return this;
   },
   style: function (attrs) {
     for (var k in attrs)
-      this.node.style[k] = attrs[k];
+      this.node.style[k] = attrs[k]
     return this;
   },
 
   space: function (space) {
     return this.attrs({space: space}, this.xml)
   },
-  txt: function (text) {
+  txt: function (text, order) {
+    if (isFinite(order))
+      return elem(this.doc().node.createTextNode(text)).addTo(this).order(order), this;
     return this.props({textContent: text})
   },
   uid: function () {
@@ -597,7 +599,7 @@ Elem.prototype.update({
     return (new Box(this.node.getBoundingClientRect())).shift(pageXOffset, pageYOffset)
   },
   polar: function (r, a) {
-    return [r * trig.cos(a), r * trig.sin(a)];
+    return [r * trig.cos(a), r * trig.sin(a)]
   },
   href: function (href) {
     return this.attrs({href: href})
@@ -749,7 +751,7 @@ SVGElem.prototype = new Elem().update({
   },
 
   transform: function (desc) {
-    var xform = [];
+    var xform = []
     for (var k in desc)
       xform.push(k + '(' + [].concat(desc[k]).join(',') + ')')
     return this.attrs({transform: xform.join(' ')})
@@ -759,13 +761,13 @@ SVGElem.prototype = new Elem().update({
     for (var i = 0; i < list.numberOfItems; i++) {
       var t = list.getItem(i), m = t.matrix;
       if (t.type == SVGTransform.SVG_TRANSFORM_MATRIX)
-        tx.matrix = [m.a, m.b, m.c, m.d, m.e, m.f];
+        tx.matrix = [m.a, m.b, m.c, m.d, m.e, m.f]
       else if (t.type == SVGTransform.SVG_TRANSFORM_TRANSLATE)
-        tx.translate = [m.e, m.f];
+        tx.translate = [m.e, m.f]
       else if (t.type == SVGTransform.SVG_TRANSFORM_SCALE)
-        tx.scale = [m.a, m.d];
+        tx.scale = [m.a, m.d]
       else if (t.type == SVGTransform.SVG_TRANSFORM_ROTATE)
-        tx.rotate = [t.angle, (m.f / m.c + m.e) / m.a, (m.e / m.b - m.f) / m.a];
+        tx.rotate = [t.angle, (m.f / m.c + m.e) / m.a, (m.e / m.b - m.f) / m.a]
       else if (t.type == SVGTransform.SVG_TRANSFORM_SKEWX)
         tx.skewX = t.angle;
       else if (t.type == SVGTransform.SVG_TRANSFORM_SKEWY)
