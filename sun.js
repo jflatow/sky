@@ -93,8 +93,12 @@ Sun = module.exports = {
   },
   fold: function (fun, acc, obj) {
     var i = 0;
-    for (var k in obj)
-      acc = fun(acc, [k, obj[k]], i++, obj)
+    if (obj instanceof Array)
+      for (var k in obj)
+        acc = fun(acc, [obj[k], true], i++, obj)
+    else
+      for (var k in obj)
+        acc = fun(acc, [k, obj[k]], i++, obj)
     return acc;
   },
 
