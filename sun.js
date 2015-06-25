@@ -1,6 +1,6 @@
 var up = function (a, b) {
   for (var k in b)
-    a[k] = b[k];
+    a[k] = b[k]
   return a;
 }
 var cls = function (cons) {
@@ -38,7 +38,7 @@ var bezier = function (t, P) {
     x += w * (p[0] || 0)
     y += w * (p[1] || 0)
   }
-  return [x, y];
+  return [x, y]
 }
 
 Sun = module.exports = {
@@ -114,8 +114,8 @@ Sun = module.exports = {
     return function (item) { return item[key] }
   },
 
-  lookup: function (obj, key) {
-    var path = key instanceof Array ? key : [key]
+  lookup: function (obj, path) {
+    var path = L(path)
     return path.reduce(function (acc, k) {
       if (acc)
         return acc[k]
@@ -123,8 +123,8 @@ Sun = module.exports = {
     }, obj)
   },
 
-  modify: function (obj, key, fun) {
-    var path = key instanceof Array ? key : [key]
+  modify: function (obj, path, fun) {
+    var path = L(path)
     var pen = Sun.lookup(obj, path.slice(0, -1)), k = L.last(path)
     if (pen && path.length)
       pen[k] = fun(pen[k])
@@ -200,16 +200,16 @@ up(Sun.Cage.prototype, {
 
 Sun.form = {
   encode: function (obj) {
-    var list = [];
+    var list = []
     for (var k in obj)
       list.push(encodeURIComponent(k) + '=' + encodeURIComponent(obj[k]));
     return list.join('&');
   },
   decode: function (str) {
-    var list = str ? str.split('&') : [];
+    var list = str ? str.split('&') : []
     return list.reduce(function (acc, item) {
       var kv = item.split('=').map(decodeURIComponent);
-      acc[kv[0]] = kv[1];
+      acc[kv[0]] = kv[1]
       return acc;
     }, {});
   }
@@ -221,7 +221,7 @@ var H = Sun.http = up(function (method, url, fun, data, hdrs) {
     if (this.readyState == this.DONE){
       fun(this)
     }
-  };
+  }
   req.open(method, url, true)
   Sun.fold(function (_, o) { req.setRequestHeader(o[0], o[1]) }, null, hdrs)
   req.send(data)
@@ -232,7 +232,9 @@ var H = Sun.http = up(function (method, url, fun, data, hdrs) {
   post: function (url, fun, data, hdrs) { return H("POST", url, fun, data, hdrs) }
 })
 
-var L = Sun.lists = {
+var L = Sun.list = up(function (x) {
+  return x instanceof Array ? x : [x]
+}, {
   last: function (list, n) { return list[list.length - (n || 1)] },
   append: function (list, item) { return list.push(item) && list },
   concat: function (item, list) { return [item].concat([].slice.call(list)) },
@@ -290,16 +292,11 @@ var L = Sun.lists = {
     if (i >= 0)
       return list.splice(i, 1)[0]
   },
-  keyfind: function (list, val, key, eq) {
+  keymodify: function (list, val, fun, key, eq) {
     var i = L.keyindex(list, val, key, eq)
     if (i >= 0)
-      return list[i];
-  },
-  keystore: function (list, val, item, key, eq) {
-    var i = L.keyindex(list, val, key, eq)
-    if (i >= 0)
-      return list[i] = item;
-    return list.push(item) && item;
+      return list[i] = fun(list[i])
+    return list.push(fun()), L.last(list)
   },
 
   times: function (list, n) {
@@ -326,18 +323,18 @@ var L = Sun.lists = {
     return z;
   },
   values: function (obj) {
-    var vals = [];
+    var vals = []
     for (var k in obj)
       vals.push(obj[k])
     return vals;
   }
-}
+})
 
 var Sec = 1000, Min = 60 * Sec, Hour = 60 * Min, Day = 24 * Hour, Week = 7 * Day;
-var DoW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-var MoY = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+var DoW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+var MoY = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 var T = Sun.time = up(function (set, rel) {
-  var rel = rel ? new Date(rel) : new Date, set = set || {};
+  var rel = rel ? new Date(rel) : new Date, set = set || {}
   return new Date(set.y == undefined ? rel.getFullYear() : set.y,
                   set.m == undefined ? rel.getMonth() : set.m,
                   set.d == undefined ? rel.getDate() : set.d,
@@ -374,8 +371,8 @@ var T = Sun.time = up(function (set, rel) {
     return rel;
   },
   fold: function (fun, acc, opt) {
-    var t = opt.start || new Date, stop = opt.stop, step = opt.step || {d: 1};
-    var f = T.pass(step, t) >= t, jump = {};
+    var t = opt.start || new Date, stop = opt.stop, step = opt.step || {d: 1}
+    var f = T.pass(step, t) >= t, jump = {}
     for (var i = 1, s = t; !stop || (f ? (t < stop) : (t > stop)); i++) {
       acc = fun(acc, t)
       for (var k in step)
@@ -385,12 +382,12 @@ var T = Sun.time = up(function (set, rel) {
     return acc;
   },
   parse: function (stamp, opt) {
-    var opt = opt || {};
+    var opt = opt || {}
     var sep = opt.sep || 'T', dsep = opt.dsep || '-', tsep = opt.tsep || ':';
     var utc = opt.utc || stamp[stamp.length - 1] == 'Z';
     var dtp = stamp.split(sep)
-    var datep = dtp[0] ? dtp[0].split(dsep).map(int) : [0, 0, 0];
-    var timep = dtp[1] ? dtp[1].substring(0, 8).split(':').map(int) : [0, 0, 0];
+    var datep = dtp[0] ? dtp[0].split(dsep).map(int) : [0, 0, 0]
+    var timep = dtp[1] ? dtp[1].substring(0, 8).split(':').map(int) : [0, 0, 0]
     if (utc)
       return new Date(Date.UTC(datep[0], datep[1] - 1, datep[2], timep[0], timep[1], timep[2]))
     return new Date(datep[0], datep[1] - 1, datep[2], timep[0], timep[1], timep[2])
