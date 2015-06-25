@@ -553,9 +553,6 @@ Elem.prototype.update({
   text: function (x, y, text, u) {
     return this.span({class: 'text'}).xy(x, y, u).txt(text)
   },
-  label: function (x, y, text, i, j, u) {
-    return this.text(x, y, text, u).anchor(i, j)
-  },
   g: function (attrs, props) {
     return this.div(attrs, props)
   },

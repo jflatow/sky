@@ -92,8 +92,6 @@ Sun = module.exports = {
     return Sun.count(L.append, [], opt)
   },
   fold: function (fun, acc, obj) {
-    if (obj && obj.reduce)
-      return obj.reduce(fun, acc)
     var i = 0;
     for (var k in obj)
       acc = fun(acc, [k, obj[k]], i++, obj)
