@@ -97,7 +97,7 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
     this.windows.push(win)
   },
   removeWindow: function (win) {
-    Sun.lists.drop(this.windows, win)
+    Sun.list.drop(this.windows, win)
   }
 })
 
