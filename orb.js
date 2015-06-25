@@ -33,7 +33,6 @@ Orb.prototype.update({
   thru: function (o, a) { return Orb.thru(this, o, a) }
 })
 Orb = module.exports = up(Orb, {
-  Types: [],
   do: function (o, f, a) {
     if (o) {
       if (o[f])
@@ -54,8 +53,6 @@ Orb = module.exports = up(Orb, {
   type: function (cons) {
     var proto = cons.prototype = new Orb;
     [].slice.call(arguments, 1).map(function (base) { up(proto, base) })
-    if (cons.name)
-      Orb.Types.push(cons)
     return function (a, r, g, s) { return new cons(this, a, r, g, s) }
   },
   walk: function (o, f, a) {
