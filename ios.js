@@ -34,53 +34,53 @@ var iOS7x = {
     var chrome = this.chrome = elem.g({class: 'chrome'})
 
     switch (opts.transition) {
-      case 'same':
-        self.xfer = function (p) { this.push(0) }
-        break;
-
-      case 'next':
-        self.xfer = function (p) {
-          if (frame.top) {
-            frame.top.chrome.style({opacity: 1 - p / 100})
-            Orb.move(frame.top.plugs, -p / 100)
-          }
-          chrome.style({opacity: p / 100})
-          content.transform({translate: (1 - p / 100) * self.dims.w})
-          this.push(1 - p / 100)
+    case 'next':
+      self.xfer = function (p) {
+        if (frame.top) {
+          frame.top.chrome.style({opacity: 1 - p / 100})
+          Orb.move(frame.top.plugs, -p / 100)
         }
-        break;
+        chrome.style({opacity: p / 100})
+        content.transform({translate: (1 - p / 100) * self.dims.w})
+        this.push(1 - p / 100)
+      }
+      break;
 
-      case 'prev':
-        elem.order(0)
-        self.xfer = function (p) {
-          if (frame.top) {
-            frame.top.chrome.style({opacity: 1 - p / 100})
-            frame.top.content.transform({translate: p / 100 * self.dims.w})
-            Orb.move(frame.top.plugs, p / 100)
-          }
-          chrome.style({opacity: p / 100})
-          this.push(p / 100 - 1)
+    case 'prev':
+      elem.order(0)
+      self.xfer = function (p) {
+        if (frame.top) {
+          frame.top.chrome.style({opacity: 1 - p / 100})
+          frame.top.content.transform({translate: p / 100 * self.dims.w})
+          Orb.move(frame.top.plugs, p / 100)
         }
-        break;
+        chrome.style({opacity: p / 100})
+        this.push(p / 100 - 1)
+      }
+      break;
 
-      case 'new':
-        self.xfer = function (p) {
-          elem.transform({translate: [0, (1 - p / 100) * self.dims.h]})
-          this.push(0, 1 - p / 100)
-        }
-        break;
+    case 'new':
+      self.xfer = function (p) {
+        elem.transform({translate: [0, (1 - p / 100) * self.dims.h]})
+        this.push(0, 1 - p / 100)
+      }
+      break;
 
-      case 'old':
-      default:
-        elem.order(0)
-        self.xfer = function (p) {
-          if (frame.top) {
-            frame.top.elem.transform({translate: [0, p / 100 * self.dims.h]})
-            Orb.move(frame.top.plugs, 0, p / 100)
-          }
-          this.push(0)
+    case 'old':
+      elem.order(0)
+      self.xfer = function (p) {
+        if (frame.top) {
+          frame.top.elem.transform({translate: [0, p / 100 * self.dims.h]})
+          Orb.move(frame.top.plugs, 0, p / 100)
         }
-        break;
+        this.push(0)
+      }
+      break;
+
+    case 'same':
+    default:
+      self.xfer = function (p) { this.push(0) }
+      break;
     }
 
     UFO.Window.call(this, frame, state, opts)

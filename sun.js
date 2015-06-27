@@ -154,6 +154,12 @@ Sun.Cage = function Cage(obj, opt) {
   this.__fns__ = {}
 }
 up(Sun.Cage.prototype, {
+  get: function (k, d) {
+    if (k in this.__obj__)
+      return this.__obj__[k]
+    return d
+  },
+
   change: function (k, v) {
     var u = this.__obj__[k]
     this.__obj__[k] = v;

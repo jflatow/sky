@@ -3,16 +3,71 @@ var Sun = require('sky/sun')
 var Orb = require('sky/orb')
 var U = Sky.util, up = Sun.up, Cage = Sun.Cage;
 
-var Nav = Sun.cls(function Nav(init, frame) {
+var Nav = Sun.cls(function Nav(init, frame, opts) {
   Cage.call(this)
   this.pages = init(this)
   this.frame = frame;
+  this.setOpts(opts)
 }, new Cage, {
+  setOpts: function (o) {
+    var self = this;
+    var opts = this.opts = up(this.opts || {manageHistory: false}, o)
+    if (opts.manageHistory) {
+      window.setTimeout(function () {
+        window.onpopstate = function (e) {
+          if (e.state)
+            self.go(self.fromHistory(e.state), null, true)
+        }
+      }, 1)
+    }
+  },
+
+  path: function (state) {
+    return {
+      tag: state.tag,
+      prev: state.prev ? this.path(state.prev) : undefined,
+      parent: state.parent ? this.path(state.parent) : undefined
+    }
+  },
+
+  toHash: function (keep, prior) {
+    var prior = prior || Sun.form.decode(window.location.hash.substr(1))
+    return '#' + Sun.form.encode(up(prior, {page: btoa(JSON.stringify(keep))}))
+  },
+
+  fromHash: function (hash) {
+    var obj = Sun.form.decode((hash || window.location.hash).substr(1))
+    return JSON.parse(atob(obj.page || '') || 'null')
+  },
+
+  toHistory: function (state) {
+    var page = this.pages[state.tag]
+    return page.toHistory ? page.toHistory(state) : this.path(state)
+  },
+
+  fromHistory: function (state) {
+    var page = this.pages[state.tag]
+    return page.fromHistory ? page.fromHistory(state) : state;
+  },
+
+  changeHistory: function (state, replace) {
+    var page = this.pages[state.tag]
+    var keep = this.toHistory(state)
+    window.history[replace ? 'replaceState' : 'pushState'](keep, page.title, this.toHash(keep))
+  },
+
+  launch: function (state, opts) {
+    var kept = this.opts.manageHistory && this.fromHash()
+    if (kept)
+      return this.go(this.fromHistory(kept), opts, true)
+    return this.go(state, opts)
+  },
+
   do: function () {
     return this.action.apply(this, arguments)()
   },
-  go: function (state, opts) {
-    return this.do('load', state, opts)
+  go: function (state, opts, load) {
+    return this.do(load ? 'load' : 'push', state, opts)
   },
 
   action: function () {
@@ -51,24 +106,30 @@ var Nav = Sun.cls(function Nav(init, frame) {
     return this.load(state, {transition: 'same'})
   },
 
+  push: function (state, opts) {
+    if (this.opts.manageHistory)
+      this.changeHistory(state)
+    return this.load(state, opts)
+  },
+
   // from STATE ->
 
   step: function (state, tag, data) {
     var state = {tag: tag, data: data, prev: state, parent: state.parent}
-    return this.load(state, {transition: 'next'})
+    return this.push(state, {transition: 'next'})
   },
   back: function (state, data) {
-    var state = data ? up(state.prev, {data: data}) : state.prev;
-    return this.load(state, {transition: 'prev'})
+    var state = up(state.prev, {data: U.dfn(data, state.data)})
+    return this.push(state, {transition: 'prev'})
   },
 
   open: function (state, tag, data) {
     var state = {tag: tag, data: data, parent: state}
-    return this.load(state, {transition: 'new'})
+    return this.push(state, {transition: 'new'})
   },
   shut: function (state, data) {
-    var state = data ? up(state.parent, {data: data}) : state.parent;
-    return this.load(state, {transition: 'old'})
+    var state = up(state.parent, {data: U.dfn(data, state.data)})
+    return this.push(state, {transition: 'old'})
   }
 })
 
