@@ -135,6 +135,10 @@ Sun = module.exports = {
     return Sun.fold(function (o, i) { return (o[i[0]] = i[1]), o }, {}, iter)
   },
 
+  select: function (obj, iter) {
+    return Sun.fold(function (o, i) { return (o[i[0]] = obj[i[0]]), o }, {}, iter)
+  },
+
   repeat: function (fun, every) {
     return fun() || setTimeout(function () {
       fun() || setTimeout(arguments.callee, every)
