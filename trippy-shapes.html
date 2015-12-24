@@ -1,0 +1,86 @@
+<html>
+  <head>
+    <title>Trippy Shapes</title>
+    <style>
+      svg {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="paper"></div>
+    <script src="all"></script>
+    <script>
+      (function () {
+        svg = Sky.svg().addTo(paper);
+
+        var defs = svg.child('defs');
+        var f1 = defs.child('filter', {id: 'blur'});
+        f1.child('feGaussianBlur', {stdDeviation: 1});
+
+        var g = svg.g();
+        var q = svg.g();
+        q.attrs({filter: 'url(#blur)'});
+
+        var P = Sky.path;
+        g.path(P.arch(50, 50, 10, 10, 20, 180))
+        var p1 = g.path()
+        var p2 = g.path().attrs({fill: 'pink'})
+        g.animate(function (_, i) {
+          p1.attrs({d: P.wedge(150, 50, 50, 50, 180 + i)})
+          p2.attrs({d: P.wedge(150, 50, 50, 50, 180 - i, 180 + i)})
+          return i < 180;
+        })
+
+        var s = 250;
+        g.path().animate(function (_, i) {
+          var r = Math.random()
+          var ci = [130, 120], cf = [250, s += ~~(i / 100) % 2 ? r : -r], cg = [350, 300]
+          this.attrs({d: (P('M', ci[0], ci[1]) +
+                          P.snake(ci[0], ci[1], cf[0], cf[1]) +
+                          P.snake(cf[0], cf[1], cg[0], cg[1]) +
+                          P('L', ci[0], cg[1]))})
+          return i < 1000;
+        }).attrs({fill: 'green', stroke: 'black', 'stroke-width': 2})
+
+        var colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'black'];
+        var w = paper.clientWidth, h = paper.clientHeight;
+        for (var i = 0; i < 1000; i++)
+          g.ellipse(Math.random() * w, Math.random() * h, 10, 10).attrs({fill: 'none', stroke: colors[i % colors.length]});
+        g.line(0, 0, 100, 200).attrs({stroke: 'black'});
+        g.link('http://apple.com', {show: 'new', title: 'hello'}).text(20, 20, 'link');
+
+        var c = q.circle(10, 10, 10);
+        c.animate(function (node, i) {
+            node.cx.baseVal.value += 1;
+            if (i < 100)
+              return true;
+          });
+        c.on('click', function () {
+            q.circle(Math.random() * w, Math.random() * h, 4);
+          });
+        c.scroll(c.wagon(c.guide()));
+        Sun.repeat(function () { return console.log('hi') || true }, 600)
+        svg.svg().xywh(100, 100, 100, 100).rect(0, 0, 10, 10).attrs({fill: Sky.RGB.mix(100)});
+
+        var root = svg.svg({viewBox: [-500, -300, 1000, 600]}).xywh(200, 100, 1000, 600)
+        var p = root.path().attrs({stroke: 'rgba(0, 0, 0, .5)', 'stroke-width': 1, fill: 'rgba(0, 0, 0, 0)'});
+        var r = root.path().attrs({stroke: 'rgba(0, 0, 0, .5)', 'stroke-width': 4, fill: 'rgba(255, 0, 0, .5)'});
+        var x = root.path().attrs({stroke: 'rgba(0, 0, 0, .5)', 'stroke-width': 8, fill: 'rgba(255, 0, 0, .5)', 'stroke-linejoin': 'round'});
+        var b = root.path(Sky.path.rect(0, 0, 10, 100)).attrs({stroke: 'grey', fill: 'lightgreen'});
+        var o = root.path(Sky.path.oval(60, -60, 30, 30)).attrs({'fill-opacity': .4});
+        var t = root.path(Sky.path.triangle(60, 60, 200, 90)).attrs({'fill-opacity': .4, 'stroke': 'black', 'stroke-width': 8, 'stroke-linejoin': 'round'});
+        var z = root.path(Sky.path.join(['M', 0, 0], ['L', [100, 100]], ['Z'])).attrs({stroke: 'black'});
+        var a = -720, b = 10;
+        root.animate(function () {
+            p.attrs({d: Sky.path.arc(0, 0, 160, 120, a, 0)}).transform({rotate: -a});
+            r.attrs({d: Sky.path.ring(50, 50, a / 3, Math.abs(a / 10), 20)});
+            x.attrs({d: Sky.path.arch(10, -10, 20, 20, 10, a)});
+            t.transform({rotate: [a, 60, 60]});
+            return (a += 2) < 720;
+          });
+      })();
+    </script>
+  </body>
+</html>
