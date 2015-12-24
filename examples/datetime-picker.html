@@ -1,0 +1,147 @@
+<html>
+  <head>
+    <title>DateTime Picker</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <style>
+      * {
+        user-select: none;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+      }
+
+      #paper {
+        width: 100%;
+        height: 100%;
+        font-family: Courier;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="paper"></div>
+    <script src="all"></script>
+    <script>
+  window.onload = function () {
+    var U = Sky.util, up = U.update, pop = U.pop;
+    var T = Sun.time, Cage = Sun.Cage;
+
+    // belt: a bunch of orbs bound together in the same translation region, and looping
+    // treadmill: fixed size units on a belt, and meant to be viewable in particular dims
+    Sky.SVGElem.prototype.update({
+      dateTimePicker: Orb.type(function DateTimePicker(root, win, opts) {
+        Cage.call(this)
+        var parent = this.parent = win;
+        var self = this;
+        var opts = this.opts = up({}, opts)
+        var elem = this.elem = root.g({'font-size': 16})
+        var dims = this.dims = opts.dims;
+
+        var boxs = dims.slice(['40%', '20%', '20%', '20%'], true)
+        var clip = elem.clipPath()
+        var mask = elem.mask()
+        var view = elem.g({'clip-path': clip.url(), 'mask': mask.url()})
+
+        var bend = function (dx, dy, cur) {
+          var t = cur.translate || [0, 0]
+          var b = day.bbox, a = Math.PI * (t[1] - b.midY) / b.h;
+          cur.matrix = [1, 0, 0, Math.cos(a), 0, 0]
+        }
+
+        var N = 9;
+        var time = T({mi: 0, s: 0}, opts.start || new Date)
+        var zday = time, zhour = time, zmin = time;
+        var base = function (opts) {
+          return up({
+            h: false,
+            zero: [0, ~~(N / 2)],
+            shape: {rows: N},
+            window: {rows: 1},
+            init: function (o) {
+              return up(o, {
+                back: o.elem.rectX(o.dims).attrs({fill: 'white'}),
+                text: o.elem.textX(o.dims, '').attrs({fill: 'black'}),
+                move: bend,
+              })
+            }
+          }, opts)
+        }
+
+        var day = view.g().wheel(null, base({
+          dims: boxs[0],
+          draw: function (o, k) {
+            o.text.txt(T.pass({d: k}, zday).toDateString())
+          },
+          settle: function (_, i) {
+            var t = self.time || new Date;
+            self.update({time: T.pass({d: i}, T({h: t.getHours(), mi: t.getMinutes()}, time))})
+          }
+        }))
+
+        var hour = view.g().wheel(null, base({
+          dims: boxs[1],
+          draw: function (o, k) {
+            o.text.txt(Sun.mod(zhour.getHours() + k, 12) || 12)
+          },
+          settle: function (_, i) {
+            self.update({time: T({h: Sun.mod(time.getHours() + i, 24)}, self.time)})
+            ampm.setActive(0, self.time.getHours() < 12 ? 0 : 1)
+          }
+        }))
+
+        var min = view.g().wheel(null, base({
+          dims: boxs[2],
+          draw: function (o, k) {
+            o.text.txt(Sun.pad(Sun.mod(zmin.getMinutes() + k * 5, 60)))
+          },
+          settle: function (_, i) {
+            console.log(i)
+            self.update({time: T({mi: Sun.mod(time.getMinutes() + i * 5, 60)}, self.time)})
+          }
+        }))
+
+        var ampm = view.g().wheel(null, base({
+          dims: boxs[3],
+          range: {rows: 2},
+          draw: function (o, k, wx, wy) {
+            if (k >= 0 && k < 2)
+              return o.text.txt(k ? 'PM' : 'AM')
+          },
+          settle: function (_, i) {
+            var pm = i, am = !pm;
+            var h_ = time.getHours(), h = self.time.getHours()
+            if (pm && h < 12 || am && h >= 12) {
+              time = T({h: (h_ + 12) % 24}, time)
+              self.update({time: T({h: am ? h % 12 : h % 12 + 12}, self.time)})
+            }
+          }
+        }))
+
+        var u = day.unit.join([hour.unit, ampm.unit])
+        var m = day.rows / 2, v = u.shift(0, ~~m * u.h)
+        clip.rectX(dims)
+        mask.rectX(dims).attrs({fill: '#555'})
+        mask.rectX(v).attrs({fill: '#fff'})
+        view.rectX(v.pad(0, 1)).attrs({fill: 'none', stroke: 'black'})
+
+        day.elem.scroll(day)
+        hour.elem.scroll(hour)
+        min.elem.scroll(min)
+        ampm.elem.scroll(ampm)
+      }, new Cage)
+    })
+
+    var win = {w: window.innerWidth, h: window.innerHeight}
+    var dim = Sky.box(0, 0, win.w, win.h)
+    var svg = Sky.svg().addTo(paper)
+
+    SVG = svg.style({width: win.w + 'px', height: win.h + 'px'})
+    CNS = svg.text().align(dim, .9, 0)
+    var dims = Sky.box(0, 0, 400, 300).center(dim.midX, dim.midY)
+    var picker = svg.dateTimePicker(null, {dims: dims})
+    picker.on('time', function (t) {
+      console.log(t)
+      CNS.txt(t)
+    })
+  }
+    </script>
+  </body>
+</html>

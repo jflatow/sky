@@ -1,3 +1,4 @@
+var env = require('./env') // NB: imports globals for node, not used directly
 var abs = Math.abs, min = Math.min, max = Math.max, Rt2 = Math.sqrt(2), Inf = Infinity;
 var add = function (p, d) { return isFinite(d) ? p + d : d }
 var def = function (x, d) { return isNaN(x) ? d : x }
@@ -13,7 +14,6 @@ var up = function (a, b) {
 }
 var ext = function (a, b) { return up(Object.create(a), b) }
 var map = function (a, f) { return a && a.map ? a.map(f) : f(a) }
-var anim = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
 var wrap = function (node) {
   if (node)
     switch (node.namespaceURI) {
@@ -472,6 +472,7 @@ Elem.prototype.update({
 
   animate: function (fun, n) {
     var self = this, i = 0;
+    var anim = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
     anim(function () {
       if (fun.call(self, self.node, i++) || i < n)
         anim(arguments.callee)
@@ -777,7 +778,7 @@ SVGElem.prototype = new Elem().update({
   }
 })
 
-Sky = module.exports = {
+var Sky = module.exports = {
   $: function (q) { return new Elem(document).$(q) },
   box: function (x, y, w, h) { return new Box({x: x, y: y, w: w, h: h}) },
   rgb: function (r, g, b, a) { return new RGB({r: r, g: g, b: b, a: a}) },

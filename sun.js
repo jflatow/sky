@@ -23,6 +23,11 @@ var pad = function (s, opt) {
     s = p + s;
   return s;
 }
+var item = function (v) {
+  if (v instanceof Array)
+    return v;
+  return [v, true]
+}
 var nchoosek = function (n, k) {
   var c = 1, d = 1;
   for (var i = n; i > k; i--) {
@@ -41,7 +46,7 @@ var bezier = function (t, P) {
   return [x, y]
 }
 
-Sun = module.exports = {
+var Sun = module.exports = {
   up: up,
   cls: cls,
   int: int,
@@ -52,6 +57,7 @@ Sun = module.exports = {
   min: min,
   mod: mod,
   pad: pad,
+  item: item,
   nchoosek: nchoosek,
   bezier: bezier,
 
@@ -91,11 +97,12 @@ Sun = module.exports = {
   range: function (opt) {
     return Sun.count(L.append, [], opt)
   },
+
   fold: function (fun, acc, obj) {
     var i = 0;
     if (obj instanceof Array)
       for (var k in obj)
-        acc = fun(acc, [obj[k], true], i++, obj)
+        acc = fun(acc, item(obj[k]), i++, obj)
     else
       for (var k in obj)
         acc = fun(acc, [k, obj[k]], i++, obj)
@@ -131,12 +138,24 @@ Sun = module.exports = {
     return obj;
   },
 
-  object: function (iter) {
-    return Sun.fold(function (o, i) { return (o[i[0]] = i[1]), o }, {}, iter)
+  object: function (iter, def) {
+    return Sun.fold(function (o, i) {
+      var k = i[0], v = i[1]
+      if (v === undefined)
+        v = def;
+      if (v !== undefined)
+        o[k] = v;
+      return o;
+    }, {}, iter)
   },
 
   select: function (obj, iter) {
-    return Sun.fold(function (o, i) { return (o[i[0]] = obj[i[0]]), o }, {}, iter)
+    return Sun.fold(function (o, i) {
+      var k = i[0], v = obj[k]
+      if (v !== undefined)
+        o[k] = v;
+      return o;
+    }, {}, iter)
   },
 
   repeat: function (fun, every) {
@@ -156,12 +175,13 @@ Sun.Cage = function Cage(obj, opt) {
   this.__opt__ = up({sep: /\s+/}, opt)
   this.__obj__ = obj || this;
   this.__fns__ = {}
+  return this;
 }
 up(Sun.Cage.prototype, {
   get: function (k, d) {
     if (k in this.__obj__)
       return this.__obj__[k]
-    return d
+    return d;
   },
 
   change: function (k, v) {
@@ -207,6 +227,23 @@ up(Sun.Cage.prototype, {
     return (self.__fns__[key] || []).map(function (f) { f.call(self, val, old, key) })
   }
 })
+
+Sun.URL = {
+  format: function (url) {
+    var str = ''
+    if (url.scheme)
+      str += url.scheme + ':'
+    if (url.authority)
+      str += '//' + url.authority;
+    if (url.path)
+      str += url.path;
+    if (url.query)
+      str += '?' + url.query;
+    if (url.fragment)
+      str += '#' + url.fragment;
+    return str;
+  }
+}
 
 Sun.form = {
   encode: function (obj) {

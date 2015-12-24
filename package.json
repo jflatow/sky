@@ -5,8 +5,22 @@
   "author": "Jared Flatow",
   "description": "A lightweight UI library",
   "main": "sky.js",
+  "browser": {
+    "./env": "./env/browser"
+  },
   "repository" : {
     "type" : "git",
     "url" : "https://github.com/jflatow/sky.git"
+  },
+  "devDependencies": {
+    "gh-pages": "latest",
+    "spackle": "latest",
+    "tap": "latest"
+  },
+  "scripts": {
+    "exemplify": "(cd examples && spackle all.js -s all.map > all)",
+    "deploy": "gh-pages -d examples",
+    "test": "tap test/*.js",
+    "test-bundle": "spackle test/*.js > test/bundle"
   }
 }

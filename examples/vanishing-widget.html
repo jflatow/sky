@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Vanishing Widget</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #content svg {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="content"></div>
+    <script src="all"></script>
+    <script>
+      (function () {
+          var root = new Sky.svg().addTo(document.querySelector('#content'));
+          var w = window.innerWidth, h = window.innerHeight;
+          var bgrd = root.path(Sky.path.rect(0, 180, 600)).attrs({fill: 'none', stroke: 'none'});
+          var oval = root.path(Sky.path.arch(0, 180, 0, 0, 40, 0));
+          var dolly = root.dolly(null, {
+              vbox: {x: -w, y: -h, width: 2 * w, height: 2 * h},
+              bbox: {x: -2 * w, y: -2 * h, width: 4 * w, height: 4 * h}
+            });
+          root.attrs({'fill': 'rgb(0, 200, 0)',
+                      'fill-opacity': .05,
+                      'stroke': 'rgb(200, 0, 0)',
+                      'stroke-opacity': .05,
+                      'stroke-width': 8});
+          var spring = root.spring({
+              kx: 64,
+              ky: 64,
+              move: function (dx, dy, spring) {
+                var ax = Math.abs(spring.dx), ay = Math.abs(spring.dy);
+                var o = (ax + ay + 10) / 200, off = Sky.util.clip(spring.dy, -360, 360);
+                root.attrs({'fill-opacity': o, 'stroke-opacity': o});
+                oval.attrs({d: Sky.path.arch(0, 180, ax, ay, 40, spring.dx, off)});
+                dolly.move(dx, dy);
+              }
+          });
+          root.scroll(spring);
+      })();
+    </script>
+  </body>
+</html>

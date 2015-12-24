@@ -1,0 +1,51 @@
+<html>
+  <head>
+    <title>Basic Map</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <style>
+      html, body {
+        border: 0;
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      * {
+        user-select: none;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+      }
+
+      #paper {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="paper"></div>
+    <script src="all"></script>
+    <script>
+      (function () {
+        var win = {w: window.innerWidth, h: window.innerHeight};
+        var dim = Sky.box(0, 0, win.w, win.h);
+        var svg = Sky.svg({width: dim.w, height: dim.h}).addTo(paper);
+        var bgd = svg.rect(dim.x, dim.y, dim.w, dim.h).fit();
+
+        var mts = Geo.mts('http://a.tiles.mapbox.com/v3/jflatow.ga9hpdd6/{z}/{x}/{y}.png');
+        var ucafe = {lat: 37.445699, lng: -122.161851};
+        var map = svg.map(null, {mts: mts, zoom: 17, center: ucafe});
+        var poi = map.add(function (g) {
+          g.circle(0, 0, 20);
+          g.rect(-10, -10, 20, 20).attrs({fill: 'white'});
+          g.text(20, 8, 'ucafe').attrs({'font-size': 24});
+          return g.wagon();
+        });
+
+        svg.swipe(Map = map)
+      })();
+    </script>
+  </body>
+</html>

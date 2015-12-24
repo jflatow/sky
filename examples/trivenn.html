@@ -1,0 +1,77 @@
+<html>
+  <head>
+    <title>TriVenn</title>
+    <style>
+      main {
+        width: 100%;
+        height: 100%;
+      }
+
+    </style>
+  </head>
+  <body>
+    <main></main>
+    <script src="all"></script>
+    <script>
+      (function () {
+        var $ = Sky.$, U = Sky.util, P = Sky.path, up = Sun.up;
+
+        Sky.Elem.prototype.update({
+          trivenn: Orb.type(function TriVenn(root, opts) {
+            var opts = up({}, opts)
+            var self = this;
+            var dims = this.dims = opts.dims || root.bbox()
+            var elem = this.elem = root.svgX(dims)
+            var draw = this.draw = function (ao) {
+              var ho = 2 * r * sin(ao), to = 2 * r * sin(ao / 2), bo = Math.sqrt(sqr(to) - sqr(ho / 2));
+              var xx = r - bo, yy = xx / Math.sqrt(3), zz = 2 * yy;
+              var Ax = cx - xx, Ay = cy + yy;
+              var Bx = cx + xx, By = cy + yy;
+              var Cx = cx, Cy = cy - zz;
+              var ex = r * sin(ao - 30), ey = Math.sqrt(3) * ex;
+              A.attrs({cx: Ax, cy: Ay})
+              B.attrs({cx: Bx, cy: By})
+              C.attrs({cx: Cx, cy: Cy})
+              I.attrs({d: (P('M', Ax, Ay) +
+                           P('m', xy(ao)) +
+                           P('a', r, r, 0, 0, 1, ex, ey) +
+                           P('a', r, r, 0, 0, 1, -2 * ex, 0) +
+                           P('a', r, r, 0, 0, 1, ex, -ey) + 'z')})
+            }
+
+            var a = opts.angle || 45, r = Math.min(dims.w, dims.h) / 12, cx = dims.midX, cy = dims.midY;
+            var T = U.trig, cos = T.cos, sin = T.sin;
+            var xy = function (deg) { return [r * cos(deg), -r * sin(deg)] }
+            var sqr = function (x) { return x * x }
+            var rgb = Sky.rgb(0, 0, 0), lo, hi;
+            var roll = function () { lo = hi || Sky.RGB.random(); hi = Sky.RGB.random(); return 0 }
+            var g = elem.g({fill: 'none', 'stroke': '#555', 'stroke-width': r / 12, cursor: 'pointer'})
+            var i = roll()
+            var I = g.path().attrs({fill: rgb, 'fill-opacity': 1, stroke: 'none'})
+            var A = g.circle(cx, cy, r)
+            var B = g.circle(cx, cy, r)
+            var C = g.circle(cx, cy, r)
+            var S = elem.text(cx, cy + 2.5 * r, opts.text || '').anchor()
+            var dead = opts.dead || elem.bind('detached')
+            console.log(elem)
+            var jack = this.jack = elem.spring(elem.spring({
+              move: function (dx, dy, s) {
+                if (i++ < 50)
+                  rgb = Sky.RGB.mix(i, {lo: lo, hi: hi, max: 50})
+                else
+                  i = roll()
+                I.attrs({fill: rgb})
+                draw(a + s.dx)
+              }
+            }, {balance: function () { dead() || self.move(500) }}))
+            self.move(0)
+            elem.press(this)
+            elem.swipe(g.tether(g.spring(g.wagon()), {rx: 3, ry: 3, bbox: Sky.box()}))
+          })
+        })
+
+        $('main').trivenn()
+      })()
+   </script>
+  </body>
+</html>

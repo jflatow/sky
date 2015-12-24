@@ -1,6 +1,6 @@
-var Sky = require('sky')
-var Sun = require('sky/sun')
-var Orb = require('sky/orb')
+var Sky = require('..')
+var Sun = require('../sun')
+var Orb = require('../ext/orb')
 var U = Sky.util, up = Sun.up, Cage = Sun.Cage;
 
 var Nav = Sun.cls(function Nav(init, frame, opts) {
@@ -225,7 +225,7 @@ var Basic = {
   window: Orb.type(Window, Window.prototype)
 }
 
-UFO = module.exports = {
+var UFO = module.exports = {
   Nav: Nav,
   Frame: Frame,
   Window: Window,

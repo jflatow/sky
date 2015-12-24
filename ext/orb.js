@@ -1,4 +1,4 @@
-var Sky = require('sky')
+var Sky = require('../sky')
 var U = Sky.util;
 var def = U.def, fnt = U.fnt, clip = U.clip;
 var pop = U.pop, up = U.update, ext = U.extend;
@@ -9,12 +9,12 @@ var cat = function (a, b) { return b ? [].concat(a, b) : a }
 var id = function (o) { return o }
 var noop = function () {}
 
-var touch = 'ontouchstart' in window;
+var touch = typeof(ontouchstart) != 'undefined';
 var pointerdown = touch ? 'touchstart' : 'mousedown';
 var pointermove = touch ? 'touchmove' : 'mousemove';
 var pointerup = touch ? 'touchend touchcancel' : 'mouseup';
 
-Orb = function Orb(obj, jack, elem) {
+var Orb = function Orb(obj, jack, elem) {
   this.jack = jack || this.jack;
   this.elem = elem || this.elem;
   this.grip = 0;

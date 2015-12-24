@@ -1,0 +1,238 @@
+<html>
+  <head>
+    <title>Crazy Scroll</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <style>
+      * {
+        user-select: none;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+      }
+
+      #paper {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="paper"></div>
+    <script src="all"></script>
+    <script>
+      (function () {
+        var win = {w: window.innerWidth, h: window.innerHeight}
+        var dim = Sky.box(0, 0, win.w, win.h)
+        var svg = Sky.svg().addTo(paper)
+        var doc = svg.doc()
+
+        SVG = svg.style({width: win.w + 'px', height: win.h + 'px'})
+
+        var randInt = function (n) { return ~~(Math.random() * n) }
+        var vbox = dim;
+
+        var s = dim.scale(.1).square().shift(100)
+        var t = s.align(dim, -1)
+        svg.rectX(t).attrs({fill: 'rgba(0, 0, 100, .5)'})
+        svg.rectX(s).attrs({fill: 'green'})
+        svg.circleX(s, Math.sqrt(2)).attrs({fill: 'rgba(0, 0, 0, .1)'})
+        svg.ellipseX(s, 2, .5).attrs({fill: 'red'})
+        svg.iconX(s, '#plus')
+        svg.textX(s, 'a', -1, -1)
+        svg.textX(s, 'b', +1, +1)
+        svg.textX(s, 'c', +1, -1)
+        svg.textX(s, 'd', -1, +1)
+        svg.textX(s, 'o')
+        svg.textX(s, 's', -1)
+        svg.textX(s, 'e', +1)
+        svg.border(-2, -3).attrs({fill: 'yellow'})
+
+        var color = Sky.rgb(0, 0, 0, .5)
+        var l = dim.slice(['10%', '20%', 100], true)
+        svg.rectX(l[0]).attrs({fill: color})
+        svg.rectX(l[1]).attrs({fill: color.update({r: 100})})
+        svg.rectX(l[2]).attrs({fill: 'rgba(0, 100, 0, .5)'})
+        svg.rectX(l[3]).attrs({fill: 'rgba(0, 0, 100, .5)'})
+
+        var noise = Sky.box(100, 200, 10, 10).stack(function (a, b, i, j, n) {
+          a.rectX(b).attrs({fill: Sky.RGB.random()})
+          return a;
+        }, svg.g(), {rows: 20, cols: 10})
+        noise.swipe(noise.wagon({
+          grab: function () { console.log('grab') },
+          free: function () { console.log('free') }
+        }), {stop: true, prevent: true})
+
+        var tbox = Sky.box(800, 100, 100, 100)
+        svg.rectX(tbox).attrs({stroke: 'black'})
+        tbox.tile(function (a, b, i, j, n) {
+          a.rectX(b).attrs({fill: Sky.RGB.random()})
+          return a;
+        }, svg.g(), {unit: {w: 20, h: 20}})
+
+        var b1 = Sky.box(300, 300, 10, 10)
+        var b2 = Sky.box(310, 310, 20, 20)
+        var b3 = Sky.box(310, 310, 30, 10)
+        svg.rectX(b1.join([b2, b3])).attrs({fill: 'blue'})
+        svg.rectX(b1).attrs({fill: 'green'})
+
+        var N = 25, k = 0;
+        var g = svg.g()
+        var p = [];
+        for (var i = 0; i < N; i++)
+          (function (i) {
+            var q = g.g()
+            var l = q.loop(null, {
+              bbox: dim,
+              wrap: function (wx) { v.txt(i += wx * N) }
+            })
+            var t = q.rect(0, 0, 50, 50).attrs({fill: 'white', stroke: 'black'})
+            var v = q.text(25, 25, i).attrs({'text-anchor': 'middle'})
+            var z = q.transform({translate: [i * 50 + 120, 20]}).wagon(l, {bbox: {y: 20, height: 0}})
+            q.tap(function () { console.log(i) })
+            z.move(0, 0)
+            p.push(z)
+          })(i)
+        g.scroll(g.guide(p))
+
+        var r = g.rect(0, 0, 100, 100).transform({translate: 15})
+        var s = r.wagon({
+          grab: function (e) {
+            r.attrs({fill: Sky.RGB.random()})
+          },
+          free: function () {
+            r.attrs({fill: 'black'})
+          },
+          move: function (dx, dy, xform) {
+            xform.skewX = Sky.util.clip(dx, -60, 60)
+            xform.skewY = Sky.util.clip(dy, -60, 60)
+          }
+        })
+        var sg = r.guide(s, {kx: 2, ky: 2, unit: {width: 200, height: 100}})
+        g.swipe(sg, {stop: true})
+        g.append(svg.circle(10, 10, 10).attrs({fill: 'green'}))
+
+        var d = svg.circle(50, 50, 10)
+        var dw = d.wagon(null, {bbox: {x: 0, y: 0, width: 1000, height: 0}})
+        var dg = d.guide(dw, {unit: {width: 100}})
+        d.scroll(dg, {stop: true})
+
+        var e = svg.circle(50, 1000, 10)
+        var c = svg.circle(0, 0, 50).transform({translate: 200})
+        c.press(c.spring({
+              move: function (dx, dy, spring) {
+                c.attrs({'fill-opacity': (100 - spring.dx) / 100})
+              }
+            }, {kx: 10, ky: 10}))
+        var mw = c.wagon({
+          move: function (dx, dy, xform) {
+            c.attrs({stroke: 'white', 'stroke-width': Math.pow(Math.abs(mg.jack.dx + mg.jack.dy), .6)})
+          }
+        })
+        var mg = c.guide(mw, {settle: function () { console.log('settle', arguments) }})
+        var mt = c.tether(mg, {rx: 2, ry: 2, bbox: {x: -100, width: 100}})
+        mg.hook = mt;
+        c.scroll(mt, {stop: true})
+        c.tap(function () { c.attrs({fill: Sky.RGB.random()}) })
+        mg.goto(3, 3)
+        M = mg;
+
+        var q = svg.g().transform({scale: 2}).rect(300, 100, 20, 20).attrs({fill: 'blue'}).shift(3, 6)
+        q.swipe(q.orb({
+          move: function (dx, dy) {
+            var ctm = q.node.getCTM()
+            q.attrs({x: q.node.x.animVal.value + dx / ctm.a,
+                     y: q.node.y.animVal.value + dy / ctm.d})
+          }
+        }), {stop: true})
+        C = new Sun.Cage(null, {sep: /\s*,\s*/})
+        C.on('x y, z', function () { console.log(arguments) })
+
+        var bgd = svg.rect(100, 100, 100, 40).attrs({rx:10, ry: 10})
+        var flick = svg.rect(100, 100, 100, 40).attrs({rx: 10, ry: 10, fill: 'rgba(0, 0, 0, .8)'})
+        flick.swipe(flick.spring(flick.wagon({
+                move: function (dx, dy, cur) {
+                  var tx = cur.translate[0];
+                  if (tx > 0) {
+                    bgd.attrs({fill: 'green'})
+                  } else if (tx < 0) {
+                    bgd.attrs({fill: 'red'})
+                  }
+                }
+              }, {bbox: {x: -100, y: 0, width: 200, height: 0}}), {
+              restore: function (dx, dy, mx, my) {
+                if (mx > 32)      dx /= 16;
+                else if (mx > 16) dx /= 8;
+                else if (mx > 1)  dx /= 4;
+                this.dx -= dx;
+                this.dy -= dy;
+                return this.push(dx, dy, this)
+              },
+              balance: function () {
+                var t = flick.transformation(), tx = t.translate[0];
+                console.log(tx)
+                if (tx >= 100) {
+                  bgd.attrs({'fill': 'rgba(0, 255, 0, .5)'})
+                } else if (tx <= -100) {
+                  bgd.attrs({'fill': 'rgba(255, 0, 0, .5)'})
+                } else if (tx) {
+                  this.move(-tx, 0)
+                }
+              }
+            }), {stop: true})
+
+        dolly = svg.dolly(null, {vbox: vbox})
+        console.log('a', vbox)
+        //dolly.setOpts({vbox: {x: dim.x, y: dim.y - dim.h / 2, width: dim.w, height: 2 * dim.h}})
+        //dolly.setOpts({bbox: {x: dim.x, y: dim.y - dim.h / 2, width: dim.w, height: 2 * dim.h}})
+        ds = svg.spring(dolly)
+        svg.swipe(ds)
+        svg.text(0, 0, 'origin')
+        svg.text(dim.x + dim.w, dim.y + dim.h, 'bbox')
+
+        svg.once('ok', function () { console.log('bubbled!') })
+        svg.dbltap(function () { console.log(this, arguments) })
+        bgd.trigger('ok', null, {bubbles: true})
+        bgd.trigger('ok', null, {bubbles: true})
+
+        d = false;
+        x = new Sun.Cage;
+        x.on('z', function () { console.log(1) })
+        x.til('z', function () { console.log(2) }, function () { return d })
+        x.on('z', function () { console.log(3) })
+        x.change('z')
+        d = true;
+        x.change('z')
+
+        var P = Sky.path;
+        svg.circle(200, 100, 3)
+        svg.circle(250, 250, 5)
+        svg.circle(250, 350, 3)
+        svg.circle(300, 200, 3)
+        svg.circle(300, 300, 5)
+        svg.circle(350, 350, 3)
+        svg.path(P.corner(250, 250, 200, 100, 10, 10, 1, 1)).attrs({fill: 'none', stroke: 'purple'})
+        svg.path(P.corner(250, 250, 300, 200, 25, 25, 0, 1)).attrs({fill: 'none', stroke: 'black'})
+        svg.path(P.corner(300, 300, 250, 350, 10, 10, 1, 0)).attrs({fill: 'none', stroke: 'blue'})
+        svg.path(P.corner(300, 300, 350, 350, 25, 25, 1, 0)).attrs({fill: 'none', stroke: 'black'})
+        svg.path(P.corner(350, 350, 400, 400)).attrs({fill: 'none', stroke: 'black'}).transform({rotate: [45, 350, 350]})
+
+        var b = Sky.box(800, 300, 200, 50)
+        svg.path(P.corner(b.x, b.midY, b.midX, b.y, 10, 10, 1, 0,
+                          function (xy) {
+                            return P.corner(b.midX, b.bottom, xy[0], xy[1], 10, 10, 0)
+                          })).attrs({fill: 'white', stroke: 'blue', 'stroke-width': 3})
+
+        svg.path(P.corner(b.right, b.midY, b.midX, b.bottom, 10, 10, 1, 0,
+                          function (xy) {
+                            return P.corner(b.midX, b.top, xy[0], xy[1], 10, 10, 0)
+                          }) + 'z').attrs({fill: 'blue', stroke: 'blue', 'stroke-width': 3})
+
+        svg.scroll({
+          move: Sun.throttle(function () {
+            console.log('throttle', arguments)
+          }, 500)
+        })
+      })();
+    </script>
+  </body>
+</html>

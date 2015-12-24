@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Weird List</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <style>
+      * {
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -moz-box-sizing: border-box;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+
+      main {
+        height: 100%;
+        width: 100%;
+      }
+
+      main svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+    <script src="all"></script>
+    <script>
+      (function () {
+        var win = Sky.box(0, 0, window.innerWidth, window.innerHeight)
+        var main = Sky.$('main')
+
+        svg = main.svg()
+        box = Sky.box(0, 0, 100, 100)
+        rect = svg.rectX(box).attrs({fill: 'blue'})
+        var b = 0, rot = rect.orb({
+          move: function(dx, dy, cur) {
+            cur.rotate = [b += dx + dy, box.midX, box.midY]
+          }
+        })
+        rect.scroll(rect.spring(rect.wagon(rect.loop(rot, {bbox: win}))))
+        svg.circle(win.midX, win.midY, 3).attrs({fill: 'green'})
+
+        div = main.div().style({width: '100pt',
+                                height: '100pt',
+                                backgroundColor: 'black'})
+        div.transform({translate: '30px'})
+        var a = 0, rot = div.orb({
+          move: function(dx, dy, cur) {
+            cur.rotate = (a += dx + dy)
+          }
+        })
+        div.scroll(div.spring(div.wagon(div.loop(rot, {bbox: win})), {kx: 4, ky: 8}))
+
+        div2 = main.div().resize(Sky.box(600, 200, 50, 50)).style({position: 'absolute', backgroundColor: 'green'})
+        div2.scroll(div2.wagon())
+
+        var wbox = Sky.box(200, 0, 200, 200)
+        wheel = main.wheel(null, {
+          dims: wbox,
+          shape: {rows: 3},
+          h: false,
+          init: function (o) {
+            o.elem.resize(o.dims).style({backgroundColor: Sky.RGB.random(), position: 'absolute'})
+            o.text = o.elem.textX(o.dims, 'hello', 0, 0).style({position: 'absolute'})
+          },
+          draw: function (o, k) {
+            o.text.txt(k)
+          }
+        })
+        main.scroll(wheel)
+      })();
+    </script>
+  </body>
+</html>

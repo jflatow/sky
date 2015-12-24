@@ -1,7 +1,7 @@
-var Sky = require('sky')
-var Sun = require('sky/sun')
-var Orb = require('sky/orb')
-var UFO = require('sky/ufo')
+var Sky = require('../sky')
+var Sun = require('../sun')
+var Orb = require('../ext/orb')
+var UFO = require('./ufo')
 var P = Sky.path, up = Sun.up;
 
 Sky.Elem.prototype.update({
@@ -139,6 +139,6 @@ var iOS7x = {
   })
 }
 
-iOS = module.exports = {
+var iOS = module.exports = {
   iOS7x: iOS7x
 }

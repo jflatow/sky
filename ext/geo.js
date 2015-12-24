@@ -1,6 +1,6 @@
-var Sky = require('sky')
-var Sun = require('sky/sun')
-var Orb = require('sky/orb')
+var Sky = require('../sky')
+var Sun = require('../sun')
+var Orb = require('./orb')
 var fmt = Sun.format, up = Sun.up, mod = Sun.mod;
 var log = Math.log, sqrt = Math.sqrt;
 var asin = Math.asin, PI = Math.PI;
@@ -27,7 +27,7 @@ up(MTS.prototype, {
   }
 })
 
-Geo = module.exports = {
+var Geo = module.exports = {
   haversine: function (lat, lng, lat_, lng_) {
     return asin(sqrt(haversin(lat_ - lat) + cos(lat) * cos(lat_) * haversin(lng_ - lng)))
   },
