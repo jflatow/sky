@@ -1,10 +1,9 @@
 var env = require('./env') // NB: imports globals for node, not used directly
 var abs = Math.abs, min = Math.min, max = Math.max, Rt2 = Math.sqrt(2), Inf = Infinity;
 var add = function (p, d) { return isFinite(d) ? p + d : d }
-var def = function (x, d) { return isNaN(x) ? d : x }
-var dfn = function (x, d) { return x == undefined ? d : x }
+var dfn = function (x, d) { return isNaN(x) ? d : x }
 var fnt = function (x, d) { return isFinite(x) ? x : d }
-var get = function (a, k, d) { var v = a[k]; return dfn(v, d) }
+var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
 var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
 var pre = function (a, k, d) { return a[k] = get(a, k, d) }
 var up = function (a, b) {
@@ -24,7 +23,6 @@ var wrap = function (node) {
 }
 var util = {
   add: add,
-  def: def,
   dfn: dfn,
   fnt: fnt,
   get: get,
@@ -59,11 +57,11 @@ var P = up(path, {
   },
   rect: function (x, y, w, h, open) {
     var open = open || P.M;
-    var h = def(h, w)
+    var h = dfn(h, w)
     return open([x, y]) + P('H', x + w) + P('V', y + h) + P('H', x) + 'Z';
   },
   border: function (box, t, r, b, l, open) {
-    var t = def(t, 0), r = def(r, t), b = def(b, t), l = def(l, r)
+    var t = dfn(t, 0), r = dfn(r, t), b = dfn(b, t), l = dfn(l, r)
     with (box) {
       var ix = x + l, iy = y + t, iw = w - l - r, ih = h - t - b;
       return (P.line(x, y, x + w, y, open) + P('v', h) + P('h', -w) + P('v', -h) +
@@ -72,7 +70,7 @@ var P = up(path, {
   },
   corner: function (x1, y1, x2, y2, rx, ry, vh, iv, open) {
     var open = open || P.M;
-    var rx = def(rx, 0), ry = def(ry, rx), iv = def(iv, 0)
+    var rx = dfn(rx, 0), ry = dfn(ry, rx), iv = dfn(iv, 0)
     var sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
     var dx = sx * rx, dy = sy * ry;
     var sd = vh ^ iv ? +(sx * sy < 0) : +(sx * sy > 0)
@@ -86,20 +84,20 @@ var P = up(path, {
   },
   chevron: function (cx, cy, w, h, t, open) {
     var open = open || P.M;
-    var h = def(h, 2 * w), g = h / 2;
-    var t = def(t, w * Rt2 / 5), o = t / Rt2, z = t / abs(Math.sin(Math.atan2(g, w - o)))
+    var h = dfn(h, 2 * w), g = h / 2;
+    var t = dfn(t, w * Rt2 / 5), o = t / Rt2, z = t / abs(Math.sin(Math.atan2(g, w - o)))
     var x = cx - w / 2, y = cy - g + o;
     return open([x, y]) + P('l', o, -o) + P('l', w - o, g) + P('l', o - w, g) + P('l', -o, -o) + P('l', w - z, o - g) + 'z'
   },
   triangle: function (cx, cy, b, h, open) {
     var open = open || P.M;
-    var h = def(h, b)
+    var h = dfn(h, b)
     var x = cx - b / 2, y = cy - h / 2;
     return open([x, y]) + P('L', cx, y + h) + P('L', x + b, y) + 'Z';
   },
   arc: function (cx, cy, rx, ry, len, off, open) {
     var open = open || P.M;
-    var len = trig.cut(def(len, 360)), off = off || 0;
+    var len = trig.cut(dfn(len, 360)), off = off || 0;
     var ix = cx + rx * trig.cos(off), iy = cy + ry * trig.sin(off)
     var fx = cx + rx * trig.cos(off + len), fy = cy + ry * trig.sin(off + len)
     return (open([ix, iy]) +
@@ -110,17 +108,17 @@ var P = up(path, {
               fx, fy))
   },
   oval: function (cx, cy, rx, ry, open) {
-    var ry = def(ry, rx)
+    var ry = dfn(ry, rx)
     return P.arc(cx, cy, rx, ry, 360, 0, open)
   },
   arch: function (cx, cy, rx, ry, t, len, off, open) {
-    var len = trig.cut(def(len, 360)), off = off || 0;
-    var t = def(t, 1)
+    var len = trig.cut(dfn(len, 360)), off = off || 0;
+    var t = dfn(t, 1)
     return (P.arc(cx, cy, rx, ry, len, off, open) +
             P.arc(cx, cy, rx + t, ry + t, -len, off + len, P.L) + 'Z')
   },
   ring: function (cx, cy, rx, ry, t, open) {
-    var t = def(t, 1)
+    var t = dfn(t, 1)
     return (P.arc(cx, cy, rx, ry, 360, 0, open) +
             P.arc(cx, cy, rx + t, ry + t, -360, 360))
   },
@@ -184,10 +182,10 @@ var Q = up(units, {
 })
 
 function Box(d, e) {
-  this.x = def(def(d.x, d.left), e ? -Inf : 0)
-  this.y = def(def(d.y, d.top), e ? -Inf : 0)
-  this.w = def(def(d.w, d.width), e ? Inf : 0)
-  this.h = def(def(d.h, d.height), e ? Inf : 0)
+  this.x = dfn(dfn(d.x, d.left), e ? -Inf : 0)
+  this.y = dfn(dfn(d.y, d.top), e ? -Inf : 0)
+  this.w = dfn(dfn(d.w, d.width), e ? Inf : 0)
+  this.h = dfn(dfn(d.h, d.height), e ? Inf : 0)
 }
 Box.prototype = {
   constructor: Box,
@@ -217,14 +215,14 @@ Box.prototype = {
     return new Box({x: bnds.x, y: bnds.y, w: bnds.right - bnds.x, h: bnds.bottom - bnds.y})
   },
   tile: function (fun, acc, opts) {
-    return this.grid(fun, acc, this.count(opts && opts.unit))
+    return this.grid(fun, acc, this.shape(opts && opts.unit))
+  },
+  shape: function (box) {
+    var u = box || this;
+    return {rows: this.h / u.h, cols: this.w / u.w}
   },
   stack: function (fun, acc, opts) {
     return this.times(opts).grid(fun, acc, opts)
-  },
-  count: function (box) {
-    var u = box || this;
-    return {rows: this.h / u.h, cols: this.w / u.w}
   },
   times: function (shape) {
     var s = up({rows: 1, cols: 1}, shape)
@@ -250,7 +248,7 @@ Box.prototype = {
     return this.copy({x: x || 0, y: y || 0})
   },
   scale: function (a, b) {
-    var w = a * this.w, h = def(b, a) * this.h;
+    var w = a * this.w, h = dfn(b, a) * this.h;
     return new Box({x: this.midX - w / 2, y: this.midY - h / 2, w: w, h: h})
   },
   shift: function (dx, dy) {
@@ -273,7 +271,7 @@ Box.prototype = {
     var o = b[ko], u = {}, s = 0, ps = [].concat(ps, undefined)
     return ps.map(function (p) {
       u[ko] = (o += u[kd] || 0)
-      u[kd] = def(p, 1 - s) * b[kd]
+      u[kd] = dfn(p, 1 - s) * b[kd]
       s += p;
       return b.copy(u)
     })
@@ -282,18 +280,18 @@ Box.prototype = {
     return this.trim(-t, -r, -b, -l)
   },
   trim: function (t, r, b, l) {
-    var t = def(t, 0), r = def(r, t), b = def(b, t), l = def(l, r)
+    var t = dfn(t, 0), r = dfn(r, t), b = dfn(b, t), l = dfn(l, r)
     return new Box({x: this.x + l, y: this.y + t, w: this.w - r - l, h: this.h - t - b})
   },
   copy: function (o) {
-    var o = o || {}, ow = def(o.w, o.width), oh = def(o.h, o.height)
+    var o = o || {}, ow = dfn(o.w, o.width), oh = dfn(o.h, o.height)
     with (this)
-      return new Box({x: def(o.x, x), y: def(o.y, y), w: def(ow, w), h: def(oh, h)})
+      return new Box({x: dfn(o.x, x), y: dfn(o.y, y), w: dfn(ow, w), h: dfn(oh, h)})
   },
   equals: function (o) {
-    var o = o || {}, ow = def(o.w, o.width), oh = def(o.h, o.height)
+    var o = o || {}, ow = dfn(o.w, o.width), oh = dfn(o.h, o.height)
     with (this)
-      return x == def(o.x, 0) && y == def(o.y, 0) && w == def(ow, 0) && h == def(oh, 0)
+      return x == dfn(o.x, 0) && y == dfn(o.y, 0) && w == dfn(ow, 0) && h == dfn(oh, 0)
   },
   toString: function () { with (this) return x + ',' + y + ',' + w + ',' + h }
 }
@@ -305,7 +303,7 @@ Box.solve = function (opts) {
   if (u && s)
     return up(o, {shape: up({rows: 1, cols: 1}, s), bbox: u.times(s)})
   if (b && u)
-    return up(o, {shape: b.count(u), unit: u.copy({x: b.x, y: b.y})})
+    return up(o, {shape: b.shape(u), unit: u.copy({x: b.x, y: b.y})})
 }
 
 function RGB(d) { up(this, d) }
@@ -577,11 +575,11 @@ Elem.prototype.update({
   circleX: function (box, p, big, u) {
     var o = big ? max : min;
     with (box || this.bbox())
-      return this.circle(midX, midY, def(p, 1) * o(w, h) / 2, u)
+      return this.circle(midX, midY, dfn(p, 1) * o(w, h) / 2, u)
   },
   ellipseX: function (box, px, py, u) {
     with (box || this.bbox())
-      return this.ellipse(midX, midY, def(px, 1) * w / 2, def(py, 1) * h / 2, u)
+      return this.ellipse(midX, midY, dfn(px, 1) * w / 2, dfn(py, 1) * h / 2, u)
   },
   rectX: function (box, u) {
     with (box || this.bbox())

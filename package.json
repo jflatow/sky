@@ -18,8 +18,8 @@
     "tap": "latest"
   },
   "scripts": {
-    "exemplify": "(cd examples && spackle all.js -s all.map > all)",
     "deploy": "gh-pages -d examples",
+    "exemplify": "(cd examples && spackle all.js -s all.map > all)",
     "test": "tap test/*.js",
     "test-bundle": "spackle test/*.js > test/bundle"
   }

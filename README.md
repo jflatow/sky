@@ -1,10 +1,12 @@
-# sky
-## a lightweight UI library
+# sky: a lightweight UI library
+
+examples: https://jflatow.github.io/sky
 
 docs coming eventually, maybe
 
 ## random note to self
 
+``
 for equal sized unit boxes
  where * :: stack, / :: grid, \ :: tile
  shape means (rows, cols)
@@ -15,3 +17,4 @@ for equal sized unit boxes
   bbox \ unit = shape
 
 so given any 2, we have all 3
+``

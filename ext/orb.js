@@ -1,6 +1,6 @@
 var Sky = require('../sky')
 var U = Sky.util;
-var def = U.def, fnt = U.fnt, clip = U.clip;
+var dfn = U.dfn, fnt = U.fnt, clip = U.clip;
 var pop = U.pop, up = U.update, ext = U.extend;
 var abs = Math.abs, log = Math.log, rnd = Math.round, E = Math.E;
 var min = Math.min, max = Math.max;
@@ -240,7 +240,7 @@ Sky.Elem.prototype.update({
 
   guide: Orb.type(function Guide(elem, jack, opts) {
     var unit, bbox, w, h, px, py, mx, my, balance, settle, truncate;
-    var dist = Sun.clockdist;
+    var dist = Sun.clockDistance;
     var opts = up({}, opts)
     var self = this;
     var spring = elem.spring(jack)
@@ -263,8 +263,8 @@ Sky.Elem.prototype.update({
       opts = up(opts, o)
       unit = pop(opts, 'unit', unit || {})
       bbox = opts.bbox || elem.bbox()
-      w = def(unit.width, def(w, bbox.width))
-      h = def(unit.height, def(h, bbox.height))
+      w = dfn(unit.width, dfn(w, bbox.width))
+      h = dfn(unit.height, dfn(h, bbox.height))
       px = self.px = opts.px || 0;
       py = self.py = opts.py || 0;
       mx = opts.mx || 1e-3;
@@ -337,8 +337,8 @@ Sky.Elem.prototype.update({
       ymin = bbox.y; ymax = bbox.bottom;
       rx = opts.rx || 1;
       ry = opts.ry || 1;
-      px = self.px = def(opts.px, px || 0)
-      py = self.py = def(opts.py, py || 0)
+      px = self.px = dfn(opts.px, px || 0)
+      py = self.py = dfn(opts.py, py || 0)
       if (px < xmin || px > xmax || py < ymin || py > ymax)
         self.goto(px < xmin ? xmin : (py > xmax ? xmax : px),
                   py < ymin ? ymin : (py > ymax ? ymax : py))

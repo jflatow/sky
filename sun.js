@@ -7,6 +7,7 @@ var cls = function (cons) {
   [].slice.call(arguments, 1).map(function (base) { up(cons.prototype, base) })
   return cons;
 }
+var def = function (x, d) { return x == undefined ? d : x }
 var int = function (x) { return parseInt(x, 10) }
 var sgn = function (x) { return x < 0 ? -1 : 1 }
 var pow = function (x, a) { return sgn(x) * Math.pow(Math.abs(x), a || 2) }
@@ -17,16 +18,21 @@ var mod = function (x, y) {
   var r = x % y;
   return r < 0 ? r + y : r;
 }
+var nil = function (x) {
+  if (x instanceof Array)
+    return []
+  if (x instanceof Object)
+    return {}
+  if (typeof(x) == 'string')
+    return ''
+  if (typeof(x) == 'number')
+    return 0
+}
 var pad = function (s, opt) {
   var s = s + '', w = opt && opt.width || 2, p = opt && opt.pad || '0';
   while (s.length < w)
     s = p + s;
   return s;
-}
-var item = function (v) {
-  if (v instanceof Array)
-    return v;
-  return [v, true]
 }
 var nchoosek = function (n, k) {
   var c = 1, d = 1;
@@ -46,9 +52,115 @@ var bezier = function (t, P) {
   return [x, y]
 }
 
+var equals = function (a, b) {
+  if (a === b)
+    return true;
+  if (typeof(a) != 'object' || typeof(b) != 'object')
+    return def(a) === def(b)
+  if (a && b) {
+    for (var k in a)
+      if (!equals(a[k], b[k]))
+        return false;
+    for (var k in b)
+      if (!equals(b[k], a[k]))
+        return false;
+    return true;
+  }
+  return false;
+}
+
+var key = function (i, k) {
+  if (k instanceof Function)
+    return k(i)
+  if (k != undefined)
+    return i[k]
+  if (i instanceof Array)
+    return i[0]
+  return i;
+}
+
+var val = function (i, v) {
+  if (v instanceof Function)
+    return v(i)
+  if (v != undefined)
+    return i[v]
+  if (i instanceof Array && i.length == 2)
+    return i[1]
+  return i;
+}
+
+var keyEquate = function (K, k) {
+  return function (i) {
+    return equals(key(i, k), K)
+  }
+}
+
+var find = function (o, f) {
+  for (var k in o)
+    if (f(o[k]))
+      return k;
+}
+
+var first = function (o, f) {
+  for (var k in o) {
+    var v = o[k]
+    if (f(v))
+      return v;
+  }
+}
+
+var fold = function (f, a, o) {
+  if (o instanceof Array)
+    for (var k in o)
+      a = f(a, o[k], k, o)
+  else
+    for (var k in o)
+      a = f(a, [k, o[k]], k, o)
+  return a;
+}
+
+var all = function (o, f) {
+  var f = f || function (x) { return !!x }
+  return fold(function (a, i) { return a && f(i) }, true, o)
+}
+
+var any = function (o, f) {
+  var f = f || function (x) { return !!x }
+  return fold(function (a, i) { return a || f(i) }, false, o)
+}
+
+var get = function (o, k) {
+  if (o instanceof Array)
+    return val(first(o, keyEquate(k)))
+  return o[k]
+}
+
+var has = function (o, k) {
+  if (o instanceof Array)
+    return any(o, keyEquate(k))
+  return k in o;
+}
+
+var set = function (o, k, v) {
+  if (o instanceof Array)
+    return L.store(o, [k, v], find(o, keyEquate(k)))
+  else
+    o[k] = v;
+  return o;
+}
+
+var del = function (o, k) {
+  if (o instanceof Array)
+    return L.purge(o, keyEquate(k))
+  else
+    delete o[k]
+  return o;
+}
+
 var Sun = module.exports = {
   up: up,
   cls: cls,
+  def: def,
   int: int,
   sgn: sgn,
   pow: pow,
@@ -56,35 +168,30 @@ var Sun = module.exports = {
   max: max,
   min: min,
   mod: mod,
+  nil: nil,
   pad: pad,
-  item: item,
   nchoosek: nchoosek,
   bezier: bezier,
+  equals: equals,
+  key: key,
+  val: val,
+  keyEquate: keyEquate,
+  find: find,
+  first: first,
+  fold: fold,
+  all: all,
+  any: any,
+  get: get,
+  has: has,
+  set: set,
+  del: del,
 
-  clockdist: function (a, b, c) {
+  clockDistance: function (a, b, c) {
     return min(mod(a - b, c || 24), mod(b - a, c || 24))
   },
 
-  ellipsis: function (text, n) {
-    if (n && text.length > n + 3)
-      return text.substr(0, n) + '\u2026';
-    return text;
-  },
-
-  equals: function (a, b) {
-    if (a || b) {
-      if (a && b) {
-        for (var k in a)
-          if (a[k] != b[k])
-            return false;
-        for (var k in b)
-          if (b[k] != a[k])
-            return false;
-        return true;
-      }
-      return false;
-    }
-    return true;
+  format: function (fmt, arg) {
+    return fmt.replace(/{(.*?)}/g, function(m, k) { return k in arg ? arg[k] : m })
   },
 
   count: function (fun, acc, opt) {
@@ -94,68 +201,66 @@ var Sun = module.exports = {
       acc = fun(acc, i, o)
     return acc;
   },
-  range: function (opt) {
-    return Sun.count(L.append, [], opt)
-  },
-
-  fold: function (fun, acc, obj) {
-    var i = 0;
-    if (obj instanceof Array)
-      for (var k in obj)
-        acc = fun(acc, item(obj[k]), i++, obj)
-    else
-      for (var k in obj)
-        acc = fun(acc, [k, obj[k]], i++, obj)
-    return acc;
-  },
-
-  format: function (fmt, arg) {
-    return fmt.replace(/{(.*?)}/g, function(m, k) { return k in arg ? arg[k] : m })
-  },
-
-  keyfun: function (key) {
-    if (key instanceof Function)
-      return key;
-    if (key == undefined)
-      return function (item) { return item }
-    return function (item) { return item[key] }
-  },
 
   lookup: function (obj, path) {
     var path = L(path)
-    return path.reduce(function (acc, k) {
-      if (acc)
-        return acc[k]
-      return acc;
-    }, obj)
+    if (path.length == 1)
+      return get(def(obj, {}), path[0])
+    if (path.length)
+      return Sun.lookup(get(def(obj, {}), path[0]), path.slice(1))
   },
 
-  modify: function (obj, path, fun) {
-    var path = L(path)
-    var pen = Sun.lookup(obj, path.slice(0, -1)), k = L.last(path)
-    if (pen && path.length)
-      pen[k] = fun(pen[k])
+  modify: function (obj, path, val, empty) {
+    var path = L(path), empty = def(nil(empty), {})
+    var fun = (val instanceof Function) ? val : function () { return val }
+    var obj = def(obj, empty)
+    if (path.length == 1)
+      return set(obj, path[0], fun(get(obj, path[0])))
+    if (path.length)
+      return set(obj, path[0], Sun.modify(get(obj, path[0]), path.slice(1), fun, empty))
     return obj;
   },
 
-  object: function (iter, def) {
-    return Sun.fold(function (o, i) {
-      var k = i[0], v = i[1]
-      if (v === undefined)
-        v = def;
-      if (v !== undefined)
-        o[k] = v;
-      return o;
-    }, {}, iter)
+  remove: function (obj, path) {
+    var path = L(path)
+    if (path.length == 1)
+      del(def(obj, {}), path[0])
+    else if (path.length)
+      Sun.remove(get(obj, path[0]), path.slice(1))
+    return obj;
+  },
+
+  object: function (iter) {
+    return fold(function (a, i) { return (a[i[0]] = i[1]), a }, {}, iter)
+  },
+
+  update: function (a, b) {
+    return fold(function (a, i) { return set(a, key(i), val(i)) }, a, b)
+  },
+
+  except: function (obj, iter) {
+    return Sun.filter(obj, function (i) { return !has(iter, key(i)) })
+  },
+
+  filter: function (obj, fun) {
+    return fold(function (a, i) {
+      if (fun(i))
+        set(a, key(i), val(i))
+      return a;
+    }, nil(obj), obj)
   },
 
   select: function (obj, iter) {
-    return Sun.fold(function (o, i) {
-      var k = i[0], v = obj[k]
-      if (v !== undefined)
-        o[k] = v;
-      return o;
-    }, {}, iter)
+    return fold(function (a, i) {
+      var k = key(i)
+      if (has(obj, k))
+        set(a, k, get(obj, k))
+      return a;
+    }, nil(obj), iter)
+  },
+
+  values: function (iter) {
+    return fold(function (a, i) { return L.append(a, val(i)) }, [], iter)
   },
 
   repeat: function (fun, every) {
@@ -270,7 +375,7 @@ var H = Sun.http = up(function (method, url, fun, data, hdrs) {
     }
   }
   req.open(method, url, true)
-  Sun.fold(function (_, o) { req.setRequestHeader(o[0], o[1]) }, null, hdrs)
+  fold(function (_, o) { req.setRequestHeader(o[0], o[1]) }, null, hdrs)
   req.send(data)
   return req;
 }, {
@@ -290,32 +395,18 @@ var L = Sun.list = up(function (x) {
     if (i >= 0)
       return list.splice(i, 1)[0]
   },
-  fold: function(list, fun, acc) {
+  purge: function (list, fun) {
     for (var i = 0; i < list.length; i++)
-      acc = fun(acc, list[i], i, list)
-    return acc;
+      if (fun(list[i]))
+        list.splice(i, 1)
+    return list;
   },
-  groupby: function (list, key) {
-    var k, key = key || function (item) { return item[0] }
-    return L.fold(list, function (acc, item) {
-      var k_ = key(item)
-      if (k_ == k)
-        acc[acc.length - 1][1].push(item)
-      else
-        acc.push([k_, [item]])
-      k = k_;
-      return acc;
-    }, [])
-  },
-  unique: function (list, key) {
-    var keys = {}, key = key || function (item) { return item }
-    return L.fold(list, function (acc, item) {
-      var k = key(item)
-      if (k in keys)
-        return acc;
-      keys[k] = true;
-      return acc.push(item), acc;
-    }, [])
+  store: function (list, item, i) {
+    if (i != undefined)
+      list[i] = item;
+    else
+      list.push(item)
+    return list;
   },
   insert: function (list, item, lte) {
     var lte = lte || function (a, b) { return a <= b }
@@ -323,34 +414,6 @@ var L = Sun.list = up(function (x) {
       if (lte(item, list[i]))
         return list.splice(i, 0, item) && list;
     return list.push(item) && list;
-  },
-
-  keyindex: function (list, val, key, eq) {
-    var eq = eq || function (a, b) { return a <= b && a >= b }
-    var key = Sun.keyfun(key)
-    for (var i = 0; i < list.length; i++) {
-      var v = key(list[i])
-      if (eq(v, val))
-        return i;
-    }
-  },
-  keydrop: function (list, val, key, eq) {
-    var i = L.keyindex(list, val, key, eq)
-    if (i >= 0)
-      return list.splice(i, 1)[0]
-  },
-  keymodify: function (list, val, fun, key, eq) {
-    var i = L.keyindex(list, val, key, eq)
-    if (i >= 0)
-      return list[i] = fun(list[i])
-    return list.push(fun()), L.last(list)
-  },
-
-  times: function (list, n) {
-    var l = []
-    for (var i = 0; i < n; i++)
-      l = l.concat(list)
-    return l;
   },
   umerge: function (x, y, lt) {
     var lt = lt || function (a, b) { return a < b }
@@ -368,12 +431,6 @@ var L = Sun.list = up(function (x) {
       }
     }
     return z;
-  },
-  values: function (obj) {
-    var vals = []
-    for (var k in obj)
-      vals.push(obj[k])
-    return vals;
   }
 })
 
@@ -382,13 +439,13 @@ var DoW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Sa
 var MoY = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 var T = Sun.time = up(function (set, rel) {
   var rel = rel ? new Date(rel) : new Date, set = set || {}
-  return new Date(set.y == undefined ? rel.getFullYear() : set.y,
-                  set.m == undefined ? rel.getMonth() : set.m,
-                  set.d == undefined ? rel.getDate() : set.d,
-                  set.h == undefined ? rel.getHours() : set.h,
-                  set.mi == undefined ? rel.getMinutes() : set.mi,
-                  set.s == undefined ? rel.getSeconds() : set.s,
-                  set.ms == undefined ? rel.getMilliseconds() : set.ms)
+  return new Date(def(set.y, rel.getFullYear()),
+                  def(set.m, rel.getMonth()),
+                  def(set.d, rel.getDate()),
+                  def(set.h, rel.getHours()),
+                  def(set.mi, rel.getMinutes()),
+                  def(set.s, rel.getSeconds()),
+                  def(set.ms, rel.getMilliseconds()))
 }, {
   get: function (k, rel) {
     var rel = rel ? new Date(rel) : new Date;

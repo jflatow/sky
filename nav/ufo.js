@@ -119,7 +119,7 @@ var Nav = Sun.cls(function Nav(init, frame, opts) {
     return this.push(state, {transition: 'next'})
   },
   back: function (state, data) {
-    var state = up(state.prev, {data: U.dfn(data, state.data)})
+    var state = up(state.prev, {data: Sun.def(data, state.data)})
     return this.push(state, {transition: 'prev'})
   },
 
@@ -128,7 +128,7 @@ var Nav = Sun.cls(function Nav(init, frame, opts) {
     return this.push(state, {transition: 'new'})
   },
   shut: function (state, data) {
-    var state = up(state.parent, {data: U.dfn(data, state.data)})
+    var state = up(state.parent, {data: Sun.def(data, state.data)})
     return this.push(state, {transition: 'old'})
   }
 })
