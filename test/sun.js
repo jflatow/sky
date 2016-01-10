@@ -3,6 +3,27 @@ var Sun = require('../sun')
 
 var L = Sun.list;
 
+test('cmp', function (t) {
+  t.ok(Sun.lt([], [1, 2, 3]))
+  t.ok(Sun.lt(['a', 'b'], ['x']))
+  t.ok(Sun.lte([], []))
+  t.ok(Sun.lte([], [1, 2, 3]))
+  t.ok(Sun.lte(['a', 'b'], ['x']))
+  t.ok(Sun.lte(['a', 'b'], ['a', 'b', 'c']))
+  t.ok(Sun.lte(['a', 'b', 'c'], ['a', 'b', 'c']))
+  t.ok(Sun.lt(['a', 'b'], ['a', 'b', 'c']))
+  t.ok(Sun.gt([1, 'a'], [0, 'b']))
+  t.ok(Sun.gte([1, 'a'], [undefined, 'b']))
+  t.notOk(Sun.lt([], []))
+  t.notOk(Sun.lt(['a', 'b', 'c'], ['a', 'b', 'c']))
+  t.notOk(Sun.lt(['a', 'b', 'd'], ['a', 'b', 'c']))
+  t.notOk(Sun.lte(['a', 'b', 'c', 'd'], ['a', 'b', 'c']))
+  t.notOk(Sun.gt([1, 'a'], [3, 'b']))
+  t.notOk(Sun.gte([undefined, 'a'], [undefined, 'b']))
+  t.notOk(Sun.gte([undefined, 'a'], [1, 'b']))
+  t.end()
+})
+
 test('equals', function (t) {
   t.ok(Sun.equals(undefined, undefined))
   t.ok(Sun.equals(undefined, null))

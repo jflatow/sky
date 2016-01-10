@@ -7,6 +7,11 @@ var cls = function (cons) {
   [].slice.call(arguments, 1).map(function (base) { up(cons.prototype, base) })
   return cons;
 }
+var cmp = function (a, b) {
+  if (a instanceof Array && b instanceof Array)
+    return L.cmp(a, b)
+  return (a == b) ? 0 : (a < b || a == undefined) ? -1 : +1;
+}
 var def = function (x, d) { return x == undefined ? d : x }
 var int = function (x) { return parseInt(x, 10) }
 var sgn = function (x) { return x < 0 ? -1 : 1 }
@@ -121,12 +126,12 @@ var fold = function (f, a, o) {
 
 var all = function (o, f) {
   var f = f || function (x) { return !!x }
-  return fold(function (a, i) { return a && f(i) }, true, o)
+  return fold(function (a, i, k) { return a && f(i, k) }, true, o)
 }
 
 var any = function (o, f) {
   var f = f || function (x) { return !!x }
-  return fold(function (a, i) { return a || f(i) }, false, o)
+  return fold(function (a, i, k) { return a || f(i, k) }, false, o)
 }
 
 var get = function (o, k) {
@@ -160,6 +165,7 @@ var del = function (o, k) {
 var Sun = module.exports = {
   up: up,
   cls: cls,
+  cmp: cmp,
   def: def,
   int: int,
   sgn: sgn,
@@ -186,12 +192,17 @@ var Sun = module.exports = {
   set: set,
   del: del,
 
+  lte: function (x, y) { return cmp(x, y) <= 0 },
+  lt: function (x, y) { return cmp(x, y) < 0 },
+  gte: function (x, y) { return cmp(x, y) >= 0 },
+  gt: function (x, y) { return cmp(x, y) > 0 },
+
   clockDistance: function (a, b, c) {
     return min(mod(a - b, c || 24), mod(b - a, c || 24))
   },
 
   format: function (fmt, arg) {
-    return fmt.replace(/{(.*?)}/g, function(m, k) { return k in arg ? arg[k] : m })
+    return fmt.replace(/{(.*?)}/g, function (m, k) { return k in arg ? arg[k] : m })
   },
 
   count: function (fun, acc, opt) {
@@ -409,14 +420,14 @@ var L = Sun.list = up(function (x) {
     return list;
   },
   insert: function (list, item, lte) {
-    var lte = lte || function (a, b) { return a <= b }
+    var lte = lte || Sun.lte;
     for (var i = 0; i < list.length; i++)
       if (lte(item, list[i]))
         return list.splice(i, 0, item) && list;
     return list.push(item) && list;
   },
   umerge: function (x, y, lt) {
-    var lt = lt || function (a, b) { return a < b }
+    var lt = lt || Sun.lt;
     var z = [], i = 0, j = 0, l;
     while (i < x.length || j < y.length) {
       if (j >= y.length || lt(x[i], y[j])) {
@@ -431,6 +442,15 @@ var L = Sun.list = up(function (x) {
       }
     }
     return z;
+  },
+
+  cmp: function (x, y) {
+    for (var i = 0; i < x.length; i++) {
+      var c = cmp(x[i], y[i])
+      if (c)
+        return c;
+    }
+    return (x.length < y.length) ? -1 : 0;
   }
 })
 
