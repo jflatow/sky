@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Simple Site</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      *[hidden] {
+        display: none;
+      }
+
+      body {
+        font-family: 'Georgia';
+        font-size: 14px;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+    <script src="all"></script>
+    <script>
+     window.onload = function () {
+       Site = UFO.derive({
+         Window: UFO.Window.derive({
+           header: function () {
+             var win = this;
+             return this.elem.unique('header', function (p) {
+               var header = p.child('header')
+               var brand = header.div().hl('HEADER', 2)
+               var navbar = header.child('nav').child('ul')
+               var navitems = {
+                 home: navbar.li('Home').on('click', win.action('step', 'home', null)),
+                 other: navbar.li('Other').on('click', win.action('step', 'other', null))
+               }
+               nav.frame.on('top', function (top) {
+                 var tag = top.state.tag;
+                 Sun.fold(function (_, item) {
+                   var k = item[0], v = item[1]
+                   v.attrs({class: k == tag ? 'active' : 'normal'})
+                 }, null, navitems)
+               })
+               client.on('authed', function (a) {
+                 navbar.show(a)
+               })
+               return header;
+             })
+           },
+
+           main: function () {
+             return this.elem.unique('main', function (p) {
+               return p.child('main')
+             })
+           },
+
+           aside: function () {
+             return this.elem.unique('aside', function (p) {
+               return p.child('aside')
+             })
+           },
+
+           footer: function () {
+             return this.elem.unique('footer', function (p) {
+               return p.child('footer').txt('FOOTER').on('click', function () {
+                 client.toggle('authed')
+               })
+             })
+           },
+
+           section: function (key) {
+             return this.main().unique('section.' + key, function (p) {
+               var section = p.child('section', {class: key})
+               section.div()
+               section.input()
+               return section;
+             })
+           },
+
+           boilerplate: Orb.type(function (win, opts) {
+             var opts = Sun.up({aside: false}, opts)
+
+             // Shared
+             win.header()
+             win.main().show(!opts.aside)
+             win.aside().show(opts.aside)
+             win.footer()
+
+             // Owned
+             win.mine = win.section(win.state.tag)
+             win.on('activated', function (a) { win.mine.show(a) })
+           }, {
+             __css__: {
+               'header': {
+                 'height': '8em',
+                 'padding': '1em 2em',
+                 'background': Sky.RGB.random(),
+                 'color': Sky.RGB.random()
+               },
+               'header nav ul': {
+                 'display': 'inline',
+                 'padding': '0',
+                 'list-style': 'none'
+               },
+               'header nav li': {
+                 'display': 'inline',
+                 'padding': '0.5em',
+                 'margin': '1em'
+               },
+               'header nav li.active': {
+                 'border-bottom': '1px dotted ' + Sky.RGB.random()
+               },
+               'main, aside': {
+                 'display': 'flex',
+                 'padding': '2em',
+                 'height': 'calc(100vh - 16em)',
+                 'overflow': 'scroll'
+               },
+               'section': {
+                 'width': '400px',
+               },
+               'footer': {
+                 'height': '8em',
+                 'padding': '2em',
+                 'background': Sky.RGB.random(),
+                 'color': Sky.RGB.random()
+               }
+             }
+           })
+
+         })
+       })
+
+       nav = Site.nav({
+         home: {
+           draw: function (win) {
+             win.boilerplate()
+             win.mine.$('input').props({value: "Hello"})
+             win.mine.$('div').txt("Poutine sriracha cray sed. Try-hard asymmetrical pork belly, selfies nesciunt slow-carb readymade messenger bag blue bottle microdosing leggings kinfolk butcher. Chambray assumenda cred fashion axe, single-origin coffee pour-over mustache marfa direct trade photo booth keytar dolor austin. Kinfolk wayfarers everyday carry, heirloom taxidermy yuccie cred drinking vinegar eiusmod tote bag aliquip forage. Gochujang iPhone retro, pinterest velit photo booth mlkshk nulla crucifix. Etsy pop-up cred, stumptown kickstarter kitsch occupy fap lomo vegan consectetur. Post-ironic quinoa literally fap.\nHeirloom listicle laboris fanny pack readymade ramps commodo, aesthetic voluptate knausgaard portland. 90's aliquip ut master cleanse +1 ex, keytar nostrud thundercats. Meh banjo pour-over, aute gochujang retro pinterest helvetica meditation keytar roof party fugiat incididunt PBR&B. Eiusmod freegan ullamco trust fund quis, austin ugh officia heirloom locavore mumblecore pour-over. Jean shorts sunt gluten-free, pork belly nulla marfa vice migas minim delectus brooklyn PBR&B selvage dolore. Sriracha placeat portland, magna nihil ut pinterest 3 wolf moon venmo hashtag beard typewriter umami. Truffaut nulla microdosing authentic polaroid 3 wolf moon.\nFarm-to-table occupy yr duis poutine. Fingerstache minim id odio mollit wolf scenester. Disrupt pabst kickstarter, small batch try-hard microdosing bitters aliquip. Aliqua hashtag you probably haven't heard of them mixtape salvia nihil. Tempor skateboard dolor, authentic readymade disrupt asymmetrical slow-carb. Taxidermy adipisicing dolor nesciunt, vinyl aliqua incididunt. Cardigan sunt aute delectus.\nMustache accusamus brunch voluptate. Pabst single-origin coffee marfa lumbersexual DIY food truck, meditation laboris viral elit anim dolore kickstarter. Squid distillery offal small batch tacos, celiac placeat. Artisan plaid typewriter four dollar toast consectetur, quinoa placeat knausgaard humblebrag XOXO yr twee tempor. Wolf waistcoat pork belly jean shorts meditation sriracha freegan. Aute reprehenderit echo park sint, pabst VHS odio eu authentic cray four loko occupy bitters culpa irony. Cold-pressed sapiente migas health goth whatever, occupy irony leggings mustache flexitarian tacos hoodie.")
+           }
+         },
+
+         other: {
+           draw: function (win) {
+             win.boilerplate()
+             win.mine.$('input').props({value: "World!"})
+             win.mine.$('div').txt("Literally hashtag dreamcatcher, put a bird on it gluten-free messenger bag tousled. Before they sold out squid narwhal meditation, organic mlkshk freegan slow-carb. Blue bottle food truck poutine plaid put a bird on it, schlitz viral. Gastropub readymade banjo ugh lumbersexual offal. Scenester tote bag crucifix blog, letterpress banjo XOXO authentic cardigan jean shorts. Street art dreamcatcher brooklyn austin fingerstache, shoreditch semiotics. Cold-pressed keffiyeh kinfolk, literally plaid church-key hella locavore kogi kombucha vice post-ironic yr tacos marfa.\nHoodie listicle echo park farm-to-table salvia truffaut. Pour-over meggings health goth, pabst XOXO salvia portland jean shorts bushwick try-hard put a bird on it small batch. Kickstarter brooklyn retro +1 small batch, messenger bag asymmetrical brunch chillwave food truck. Austin green juice butcher, art party master cleanse try-hard bitters portland schlitz fanny pack salvia truffaut raw denim put a bird on it. Ramps asymmetrical fap, direct trade yuccie gastropub flannel kogi pork belly waistcoat meggings farm-to-table iPhone. Leggings paleo portland fixie. Actually gluten-free wayfarers godard, direct trade letterpress austin gastropub lomo.\nMicrodosing single-origin coffee taxidermy, cred umami mumblecore kitsch forage. Roof party vinyl tumblr pour-over 3 wolf moon fashion axe truffaut. Organic offal trust fund, hella 3 wolf moon brooklyn gluten-free freegan intelligentsia etsy wolf schlitz. Crucifix green juice pork belly heirloom, single-origin coffee artisan fixie YOLO. Tattooed shoreditch shabby chic crucifix, health goth selfies brunch paleo etsy everyday carry twee messenger bag. Stumptown tattooed direct trade, deep v YOLO roof party neutra pop-up selvage polaroid VHS chartreuse gochujang squid. Squid photo booth kitsch, dreamcatcher tousled scenester ugh pug wolf.\nBefore they sold out gentrify portland kale chips stumptown. Biodiesel vegan kitsch, banh mi echo park tumblr direct trade fashion axe humblebrag. Plaid ramps viral gochujang. Cray shoreditch beard, wolf williamsburg viral meditation artisan synth fingerstache. Pickled tilde crucifix XOXO, forage whatever heirloom shabby chic bushwick locavore chambray craft beer actually bitters beard. Yr migas cred, put a bird on it meh pinterest cold-pressed brooklyn kogi chillwave tofu. Normcore four dollar toast butcher, chillwave iPhone fingerstache meditation.")
+           }
+         },
+
+         login: {
+           draw: function (win) {
+             win.boilerplate({aside: true})
+             win.aside().txt("You must be signed in to see this, please login.")
+           }
+         }
+       })
+
+       client = (new Sun.Cage).on('authed', function (authed) {
+         if (authed)
+           nav.launch({tag: 'home'})
+         else
+           nav.go({tag: 'login'})
+       })
+       client.change('authed', true)
+     }
+    </script>
+  </head>
+  <body></body>
+</html>

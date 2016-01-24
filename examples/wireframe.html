@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Wireframe</title>
+    <style>
+      div {
+        border: 1px solid black;
+        padding: 1em;
+      }
+
+     .row > div + div {
+        border-left: 0;
+     }
+
+     .col > div + div {
+        border-top: 0;
+     }
+    </style>
+    <script src="all"></script>
+    <script>
+     window.onload = function () {
+       var Q = Sky.units;
+       var body = Sky.$(document.body)
+       var row = body.row(['fit', 'fit', '100%', 'fit'])
+       row.nth(0).txt('ok')
+       row.nth(1).txt('hello world')
+       row.nth(-2).txt('mid').style({textAlign: 'center'})
+       row.nth(-1).txt('end')
+
+       body.child('br')
+       body.child('br')
+
+       var col = body.col(['fit', 40, 'fit', '4em'])
+       col.nth(0).txt('zero')
+       col.nth(1).txt('one').style({textAlign: 'center'})
+
+       var two = col.nth(2).row(['fit', '100%', 'fit'], true).style({alignItems: 'baseline'})
+       two.nth(0).div().txt('icon')
+       two.nth(1).span().txt('label')
+       two.nth(2).span().txt('mini')
+
+       col.nth(3).style({position: 'relative'})
+         .div().txt('three').put(0, 0)
+         .span().put(1, -1)
+          .div().txt('3').put(0, 0).style(Q({borderRadius: '1em', width: '1em', height: '1em', padding: '3px', textAlign: 'center', backgroundColor: 'red', color: 'white'})).shift(50, 50)
+     }
+    </script>
+  </head>
+  <body></body>
+</html>

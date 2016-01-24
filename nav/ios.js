@@ -20,13 +20,14 @@ Sky.SVGElem.prototype.update({
   }
 })
 
-var iOS7x = {
-  frame: Orb.type(function iOS7xFrame(pkg, elem, opts) {
+var iOS7x = UFO.derive({
+  Frame: UFO.Frame.subcls(function iOS7xFrame(pkg, elem, opts) {
     var elem = this.elem = elem.g({class: 'frame'})
+    var opts = up({kx: 1.5}, opts)
     UFO.Frame.call(this, pkg, elem, opts)
-  }, UFO.Frame.prototype),
+  }),
 
-  window: Orb.type(function iOS7xWindow(frame, state, opts) {
+  Window: UFO.Window.subcls(function iOS7xWindow(frame, state, opts) {
     var opts = up({}, opts)
     var self = this;
     var elem = this.elem = frame.elem.g({class: 'window'})
@@ -84,11 +85,12 @@ var iOS7x = {
     }
 
     UFO.Window.call(this, frame, state, opts)
-  }, UFO.Window.prototype, {
+  }, {
     reset: function () {
       this.chrome.clear()
       this.content.clear()
       this.plugs.splice(0, -1)
+      UFO.Window.prototype.reset.call(this)
     },
 
     background: Orb.type(function Background(win, opts) {
@@ -106,7 +108,7 @@ var iOS7x = {
       var elem = this.elem = win.chrome.g({class: 'navbar'})
 
       var m = dims.midY, b = dims.part([.3, .4, .3], true)
-      var state = win.state, nav = state.nav, page = nav.pages[state.tag], prev = state.prev;
+      var state = win.state, nav = win.frame.nav, page = nav.pages[state.tag], prev = state.prev;
       var title = opts.title || page.title, left = opts.left, right = opts.right;
 
       var bgrd = this.bgrd = elem.rect(x, y, w, h)
@@ -137,7 +139,7 @@ var iOS7x = {
       })
     })
   })
-}
+})
 
 var iOS = module.exports = {
   iOS7x: iOS7x

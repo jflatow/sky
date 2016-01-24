@@ -3,10 +3,8 @@ var up = function (a, b) {
     a[k] = b[k]
   return a;
 }
-var cls = function (cons) {
-  [].slice.call(arguments, 1).map(function (base) { up(cons.prototype, base) })
-  return cons;
-}
+var ext = function (a, b) { return up(Object.create(a), b) }
+var cat = function (a, b) { return b ? [].concat(a, b) : a }
 var cmp = function (a, b) {
   if (a instanceof Array && b instanceof Array)
     return L.cmp(a, b)
@@ -162,9 +160,15 @@ var del = function (o, k) {
   return o;
 }
 
+var pop = function (o, k) {
+  var v = get(o, k)
+  return del(o, k), v;
+}
+
 var Sun = module.exports = {
   up: up,
-  cls: cls,
+  ext: ext,
+  cat: cat,
   cmp: cmp,
   def: def,
   int: int,
@@ -191,6 +195,7 @@ var Sun = module.exports = {
   has: has,
   set: set,
   del: del,
+  pop: pop,
 
   lte: function (x, y) { return cmp(x, y) <= 0 },
   lt: function (x, y) { return cmp(x, y) < 0 },
@@ -287,6 +292,24 @@ var Sun = module.exports = {
   }
 }
 
+var derive = function (cons, args) {
+  var copy = function () { return cons.apply(this, arguments) }
+  return extend(cls(copy), cat(cons.prototype, args))
+}
+var extend = function (cons, args) {
+  return [].reduce.call(args, up, cons.prototype), cons;
+}
+
+var cls = Sun.cls = up(function (cons) {
+  return up(extend(cons, [].slice.call(arguments, 1)), cls)
+}, {
+  derive: function () { return derive(this, [].slice.call(arguments)) },
+  extend: function () { return extend(this, [].slice.call(arguments)) },
+  subcls: function (cons) {
+    return extend(cons, cat(this.prototype, [].slice.call(arguments, 1)))
+  }
+})
+
 Sun.Cage = function Cage(obj, opt) {
   this.__opt__ = up({sep: /\s+/}, opt)
   this.__obj__ = obj || this;
@@ -314,16 +337,12 @@ up(Sun.Cage.prototype, {
 
   on: function (keys, fun) {
     var fns = this.__fns__, sep = this.__opt__.sep;
-    keys.split(sep).map(function (k) { (fns[k] = fns[k] || []).push(fun) })
+    keys.split(sep).map(function (k) { L.keep(fns[k] = fns[k] || [], fun) })
     return this;
   },
   off: function (keys, fun) {
     var fns = this.__fns__, sep = this.__opt__.sep;
-    keys.split(sep).map(function (k) {
-      var i = (fns[k] || []).indexOf(fun)
-      if (i >= 0)
-        delete fns[k][i]
-    })
+    keys.split(sep).map(function (k) { L.drop(fns[k] || [], fun) })
     return this;
   },
   once: function (keys, fun) {
@@ -341,6 +360,9 @@ up(Sun.Cage.prototype, {
   trigger: function (key, val, old) {
     var self = this;
     return (self.__fns__[key] || []).map(function (f) { f.call(self, val, old, key) })
+  },
+  toggle: function (key) {
+    return this.change(key, !this[key])
   }
 })
 
@@ -405,6 +427,11 @@ var L = Sun.list = up(function (x) {
     var i = list.indexOf(item)
     if (i >= 0)
       return list.splice(i, 1)[0]
+  },
+  keep: function (list, item) {
+    var i = list.indexOf(item)
+    if (i < 0)
+      return list.push(item)
   },
   purge: function (list, fun) {
     for (var i = 0; i < list.length; i++)

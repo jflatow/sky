@@ -4,11 +4,19 @@ window = {}
 window.document = document = {
   createElementNS: function () {}
 }
+window.location = document.location = {
+  hash: '',
+  href: '',
+  search: ''
+}
 
-atob = function atob(str) {
+window.localStorage = localStorage = {}
+window.sessionStorage = sessionStorage = {}
+
+window.atob = atob = function atob(str) {
   return new Buffer(str, 'base64').toString('utf8')
 }
 
-btoa = function btoa(str) {
+window.btoa = btoa = function btoa(str) {
   return new Buffer(str).toString('base64')
 }

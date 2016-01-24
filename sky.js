@@ -6,12 +6,6 @@ var fnt = function (x, d) { return isFinite(x) ? x : d }
 var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
 var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
 var pre = function (a, k, d) { return a[k] = get(a, k, d) }
-var up = function (a, b) {
-  for (var k in b)
-    a[k] = b[k]
-  return a;
-}
-var ext = function (a, b) { return up(Object.create(a), b) }
 var map = function (a, f) { return a && a.map ? a.map(f) : f(a) }
 var wrap = function (node) {
   if (node)
@@ -21,6 +15,11 @@ var wrap = function (node) {
     default: return new Elem(node)
     }
 }
+var up = function (a, b) {
+  for (var k in b)
+    a[k] = b[k]
+  return a;
+}
 var util = {
   add: add,
   dfn: dfn,
@@ -28,10 +27,9 @@ var util = {
   get: get,
   pop: pop,
   pre: pre,
-  update: up,
-  extend: ext,
   map: map,
   wrap: wrap,
+  update: up,
   copy: function (b) { return up({}, b) },
   clip: function (x, m, M) { return min(max(x, m), M) },
   randInt: function (m, M) { return Math.round((M - m) * Math.random()) + m }
@@ -151,6 +149,7 @@ var Q = up(units, {
     bottom: 'px',
     width: 'px',
     height: 'px',
+    size: 'px', // NB: generalized magnitude
     translate: 'px',
     rotate: 'deg',
     skewX: 'deg',
@@ -349,6 +348,11 @@ Elem.prototype.update({
   append: function (child) {
     return child.addTo(this), this;
   },
+  before: function (other) {
+    if (other)
+      other.node.parentNode.insertBefore(this.node, other.node)
+    return this;
+  },
   child: function (elem, attrs, props) {
     return new this.constructor(elem, attrs, props).addTo(this)
   },
@@ -378,6 +382,10 @@ Elem.prototype.update({
   },
   each: function (sel, fun, acc) {
     return [].reduce.call(this.node.querySelectorAll(sel), fun, acc) || this;
+  },
+  nth: function (n) {
+    var c = this.node.children, C = c.length;
+    return wrap(c[n < 0 ? C + n : n])
   },
   parent: function () {
     return wrap(this.node.parentNode)
@@ -521,6 +529,12 @@ Elem.prototype.update({
   svg: function (attrs, props) {
     return svg(up({class: 'svg'}, attrs), props).addTo(this)
   },
+  hl: function (text, level) {
+    return this.child('h' + (level || 1)).txt(text)
+  },
+  li: function (text) {
+    return this.child('li').txt(text)
+  },
   link: function (href) {
     return this.child('a').href(href)
   },
@@ -589,6 +603,25 @@ Elem.prototype.update({
     return this.text(0, 0, text, u).align(box || this.bbox(), ax, ay)
   },
 
+  flex: function (ps, hzn, u) {
+    return ps.reduce(function (r, p) {
+      var f, q;
+      if (p == 'fit')
+        f = '0 0 auto'
+      else if ((q = Q.unify('size', p, u)).substr(-1) == '%')
+        f = '1 1 ' + q;
+      else
+        f = '0 0 ' + q;
+      return r.g().style({flex: f}), r;
+    }, this.style({display: 'flex', flexDirection: hzn ? 'row' : 'column'}))
+  },
+  row: function (ps, u) {
+    return this.g({class: 'row'}).flex(ps, true, u)
+  },
+  col: function (ps, u) {
+    return this.g({class: 'col'}).flex(ps, false, u)
+  },
+
   anchor: function (i, j) {
     var a = i < 0 ? 0 : (i > 0 ? -100 : -50)
     var b = j < 0 ? 0 : (j > 0 ? -100 : -50)
@@ -604,10 +637,13 @@ Elem.prototype.update({
     return this.attrs({href: href})
   },
   xy: function (x, y, u) {
-    return this.style(Q({left: x, top: y}, u))
+    return this.style(Q({left: x, top: y, position: 'absolute'}, u))
   },
   xywh: function (x, y, w, h, u) {
-    return this.style(Q({left: x, top: y, width: w, height: h}, u))
+    return this.style(Q({left: x, top: y, width: w, height: h, position: 'absolute'}, u))
+  },
+  put: function (ax, ay, u) {
+    return this.align(Sky.box(0, 0, 100, 100), ax, ay, up({top: '%', left: '%'}, u))
   },
   align: function (box, ax, ay, u) {
     return this.place(Sky.box().align(box, ax, ay), u).anchor(ax, ay)
@@ -633,19 +669,10 @@ Elem.prototype.update({
     for (var k in desc)
       xform.push(k + '(' + Q.unify(k, [].concat(desc[k]), u).join(',') + ')')
     xform = xform.join(' ')
-    return this.style({transform: xform,
-                       '-moz-transform': xform,
-                       '-ms-transform': xform,
-                       '-o-transform': xform,
-                       '-webkit-transform': xform})
+    return this.style({transform: xform})
   },
   transformation: function (val, u) {
-    var s = this.node.style, val = val ||
-        s['transform'] ||
-        s['-webkit-transform'] ||
-        s['-o-transform'] ||
-        s['-ms-transform'] ||
-        s['-moz-transform'] || '';
+    var s = this.node.style, val = val || s['transform'] || '';
     var m, p = /(\w+)\(([^\)]*)\)/g, tx = {}
     while (m = p.exec(val)) {
       var k = m[1], v = m[2].split(',')

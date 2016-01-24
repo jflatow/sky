@@ -13,14 +13,14 @@
     "url" : "https://github.com/jflatow/sky.git"
   },
   "devDependencies": {
+    "browserify": "latest",
     "gh-pages": "latest",
-    "spackle": "latest",
     "tap": "latest"
   },
   "scripts": {
     "deploy": "gh-pages -d examples",
-    "exemplify": "(cd examples && spackle all.js -s all.map > all)",
+    "exemplify": "(cd examples && browserify all.js > all)",
     "test": "tap test/*.js",
-    "test-bundle": "spackle test/*.js > test/bundle"
+    "test-bundle": "browserify test/*.js > test/bundle"
   }
 }

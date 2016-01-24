@@ -3,12 +3,13 @@ var Sun = require('../sun')
 var Orb = require('../ext/orb')
 var U = Sky.util, up = Sun.up, Cage = Sun.Cage;
 
-var Nav = Sun.cls(function Nav(init, frame, opts) {
+var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
   Cage.call(this)
-  this.pages = init(this)
-  this.frame = frame;
+  this.pages = pages instanceof Function ? pages(this) : pages;
+  this.frame = frame || pkg.frame()
+  this.frame.nav = this;
   this.setOpts(opts)
-}, new Cage, {
+}, Cage.prototype, {
   setOpts: function (o) {
     var self = this;
     var opts = this.opts = up(this.opts || {manageHistory: false}, o)
@@ -66,6 +67,7 @@ var Nav = Sun.cls(function Nav(init, frame, opts) {
   do: function () {
     return this.action.apply(this, arguments)()
   },
+
   go: function (state, opts, load) {
     return this.do(load ? 'load' : 'push', state, opts)
   },
@@ -97,7 +99,6 @@ var Nav = Sun.cls(function Nav(init, frame, opts) {
   // -> to STATE
 
   load: function (state, opts) {
-    var state = up(state, {nav: this})
     return this.draw(state.tag, this.frame.window(state, opts))
   },
 
@@ -135,7 +136,8 @@ var Nav = Sun.cls(function Nav(init, frame, opts) {
 
 var Frame = Sun.cls(function Frame(pkg, elem, opts) {
   Cage.call(this)
-  this.elem = elem;
+  this.elem = elem || Sky.$(document.body)
+  this.style = this.initStyle(pkg)
   this.window = pkg.window;
   this.windows = []
   this.on('top', function (n, o) {
@@ -145,29 +147,48 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
     }
   })
   this.setOpts(opts)
-}, new Cage, {
+}, Cage.prototype, Orb.prototype, {
   setOpts: function (o) {
-    this.opts = up(this.opts || {kx: 1.5}, o)
+    var self = this;
+    this.opts = up(this.opts || {kx: 0}, o)
     this.dims = this.opts.dims || this.elem.bbox()
     this.line = this.opts.line || this.dims.copy({h: 20})
-    this.windows.map(function (win) {
-      win.state.nav.redraw(win)
-    })
+    this.windows.map(function (win) { self.nav.redraw(win) })
+  },
+  initStyle: function (pkg) {
+    var frame = this;
+    return [pkg.Frame, pkg.Window, Sky.Elem, Sky.SVGElem].reduce(function (s, c) {
+      return Sun.fold(function (s, i) {
+        var pro = i[1] && i[1].prototype;
+        var css = pro && pro.__css__;
+        if (css instanceof Function)
+          s.addRules(css(pkg, frame))
+        else if (css)
+          s.addRules(css)
+        return s;
+      }, s, c.prototype)
+    }, this.makeStyle())
+  },
+  makeStyle: function () {
+    var head = this.elem.doc().$('head')
+    return head.child('style').before(head.$('style'))
   },
   addWindow: function (win) {
     this.windows.push(win)
   },
   removeWindow: function (win) {
     Sun.list.drop(this.windows, win)
-  }
+  },
 })
 
 var Window = Sun.cls(function Window(frame, state, opts) {
   var self = this;
   var elem = this.elem = this.elem || frame.elem;
+  var opts = up({detach: this.elem !== frame.elem}, opts)
+  Cage.call(this)
   this.thru(frame, ['dims', 'line'])
   this.frame = frame;
-  this.state = up(state, {win: this})
+  this.state = state;
   this.percent = 0;
   this.jack = elem.spring(elem.orb({
     move: function (dx) {
@@ -191,7 +212,7 @@ var Window = Sun.cls(function Window(frame, state, opts) {
   })
   this.setOpts(opts)
   this.frame.addWindow(self)
-}, {
+}, Cage.prototype, Orb.prototype, {
   setOpts: function (o) {
     this.opts = up(this.opts || {kx: this.frame.opts.kx}, o)
     this.jack.setOpts({kx: this.opts.kx})
@@ -199,35 +220,44 @@ var Window = Sun.cls(function Window(frame, state, opts) {
   doBecomeActive: function () {
     this.frame.change('top', this)
   },
-  didBecomeActive: function () { },
-  didBecomeInactive: function () { this.remove() },
-  didNotBecomeActive: function () { this.remove() },
+  didBecomeActive: function () { this.change('activated', true) },
+  didBecomeInactive: function () { this.change('activated', false), this.remove() },
+  didNotBecomeActive: function () { this.change('activated', false), this.remove() },
   remove: function () {
-    if (this.elem !== this.frame.elem)
+    if (this.opts.detach)
       this.elem.remove()
     this.frame.removeWindow(this)
   },
-  reset: function () { return this },
+  reset: function () {
+    this.__fns__ = {}
+    return this;
+  },
   xfer: function (p) { this.push(p) },
 
   do: function (what) {
-    var state = this.state, nav = state.nav;
+    var state = this.state, nav = this.frame.nav;
     return nav.do.apply(nav, [what, state].concat([].slice.call(arguments, 1)))
   },
   action: function (what) {
-    var state = this.state, nav = state.nav;
+    var state = this.state, nav = this.frame.nav;
     return nav.action.apply(nav, [what, state].concat([].slice.call(arguments, 1)))
   }
 })
 
 var Basic = {
-  frame: Orb.type(Frame, Frame.prototype),
-  window: Orb.type(Window, Window.prototype)
-}
-
-var UFO = module.exports = {
   Nav: Nav,
   Frame: Frame,
   Window: Window,
-  Basic: Basic
+  derive: function (ext) {
+    var pkg = up(up({}, this), ext)
+    return up(pkg, {
+      nav: function (pages, frame, opts) {
+        return new pkg.Nav(pkg, pages, frame, opts)
+      },
+      frame: Orb.type(pkg.Frame),
+      window: Orb.type(pkg.Window)
+    })
+  }
 }
+
+var UFO = module.exports = Basic.derive({})

@@ -1,11 +1,10 @@
 var Sky = require('../sky')
+var Sun = require('../sun')
 var U = Sky.util;
-var dfn = U.dfn, fnt = U.fnt, clip = U.clip;
-var pop = U.pop, up = U.update, ext = U.extend;
+var dfn = U.dfn, fnt = U.fnt, clip = U.clip, pop = U.pop, up = U.update;
+var cat = Sun.cat, ext = Sun.ext, sgn = Sun.sgn;
 var abs = Math.abs, log = Math.log, rnd = Math.round, E = Math.E;
 var min = Math.min, max = Math.max;
-var sgn = function (x) { return x < 0 ? -1 : 1 }
-var cat = function (a, b) { return b ? [].concat(a, b) : a }
 var id = function (o) { return o }
 var noop = function () {}
 
@@ -14,14 +13,12 @@ var pointerdown = touch ? 'touchstart' : 'mousedown';
 var pointermove = touch ? 'touchmove' : 'mousemove';
 var pointerup = touch ? 'touchend touchcancel' : 'mouseup';
 
-var Orb = function Orb(obj, jack, elem) {
+var Orb = Sun.cls(function Orb(obj, jack, elem) {
   this.jack = jack || this.jack;
   this.elem = elem || this.elem;
   this.grip = 0;
-  this.update(obj)
-}
-Orb.prototype.update = function (obj) { return up(this, obj) }
-Orb.prototype.update({
+  up(this, obj)
+}, {
   prop: function (f, a) { return Orb.do(this.jack, f, a) },
   grab: function () { this.grip++; return this.prop('grab', arguments) },
   free: function () { this.grip--; return this.prop('free', arguments) },
@@ -51,9 +48,9 @@ Orb = module.exports = up(Orb, {
     return Orb.grab(o), Orb.do(o, f, a), Orb.free(o), o;
   },
   type: function (cons) {
-    var proto = cons.prototype = new Orb;
-    [].slice.call(arguments, 1).map(function (base) { up(proto, base) })
-    return function (a, r, g, s) { return new cons(this, a, r, g, s) }
+    var cons = Sun.cls.extend.apply(cons, cat(new Orb, [].slice.call(arguments, 1)))
+    var func = function (a, r, g, s) { return new cons(this, a, r, g, s) }
+    return up(func, {prototype: cons.prototype})
   },
   walk: function (o, f, a) {
     return f.call(o, o.parent ? Orb.walk(o.parent, f, a) : a)
@@ -192,7 +189,7 @@ Sky.Elem.prototype.update({
 
   spring: Orb.type(function Spring(elem, jack, opts) {
     var lock, kx, ky, lx, ly, tx, ty, restore, stretch, balance, perturb, anim;
-    var opts = up({}, opts)
+    var opts = up({kx: 8, ky: 8, lx: 1, ly: 1, tx: 1, ty: 1}, opts)
     this.dx = 0;
     this.dy = 0;
     this.elem = elem;
@@ -219,14 +216,14 @@ Sky.Elem.prototype.update({
     this.setOpts = function (o) {
       opts = up(opts, o)
       lock = opts.lock;
-      kx = opts.kx || 8; ky = opts.ky || 8;
-      lx = opts.lx || 1; ly = opts.ly || 1;
-      tx = opts.tx || 1; ty = opts.ty || 1;
+      kx = opts.kx; ky = opts.ky;
+      lx = opts.lx; ly = opts.ly;
+      tx = opts.tx; ty = opts.ty;
       restore = opts.restore || function (dx, dy, mx, my) {
         if (lock && this.grip)
           return;
-        if (mx > tx) dx /= kx * log(mx + 1)
-        if (my > ty) dy /= ky * log(my + 1)
+        if (mx > tx) dx /= kx * log(mx + 1) || 1;
+        if (my > ty) dy /= ky * log(my + 1) || 1;
         this.dx -= dx;
         this.dy -= dy;
         return this.push(dx, dy, this)
