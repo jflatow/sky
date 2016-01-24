@@ -1,0 +1,223 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Pages</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no,minimal-ui">
+    <style>
+      * {
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -moz-box-sizing: border-box;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+
+      main {
+        height: 100%;
+        width: 100%;
+      }
+
+      main svg {
+        height: 100%;
+        width: 100%;
+        font-family: Helvetica Neue;
+        font-weight: 300;
+      }
+
+      rect {
+        fill: #f8f8f8;
+      }
+
+      .navbar {
+        font-size: 1em;
+      }
+
+      .navbar .title {
+        font-weight: 500;
+      }
+
+      .navbar .button {
+        cursor: pointer;
+        fill: blue;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+    <script src="all"></script>
+    <script>
+      (function () {
+        var Cage = Sun.Cage, up = Sun.up;
+        var opts = {aspectRatio: Math.min(window.innerWidth / window.innerHeight, .8)}
+        var dims = opts.dims = Sky.box(0, 0, 200, 200 / opts.aspectRatio)
+        var root = Sky.$('main').svg()
+        var frame = iOS.iOS7x.frame(root, opts)
+        var size = function () {
+          var win = Sky.box(0, 0, window.innerWidth, window.innerHeight)
+          if (win.w < win.h)
+            dims = Sky.box(0, 0, win.w, win.w / opts.aspectRatio)
+          else
+            dims = Sky.box(100, 0, win.h * opts.aspectRatio, win.h)
+          frame.setOpts(up(opts, {dims: dims.center(win.midX, win.midY)}))
+        }
+        setTimeout(size)
+        window.onresize = size;
+
+        var main = iOS.iOS7x.nav(function (nav) {
+          return {
+            settings: {title: 'Settings'},
+            skej: {title: 'Skej'},
+            queue: {title: 'Queue'},
+            who: {title: 'Who'},
+            when: {title: 'When'},
+            where: {title: 'Where'},
+            review: {title: 'Review'}
+          }
+        }, frame)
+
+        /* drawing */
+
+        main.pages.settings.draw = function (win) {
+          var back = win.background()
+          var tbar = win.navbar({
+            left: {label: 'Feedback', action: main.action('shut', up(win.state, {parent: {tag: 'settings'}}), null)},
+            right: {label: 'Skej', action: win.action('step', 'skej')}
+          })
+          var dims = win.dims.trim(tbar.dims.height, 0, 0, 0)
+          var elem = win.content;
+          elem.rectX(dims).style({fill: Sky.RGB.random()})
+          elem.tap(win.action('reload'))
+        }
+
+        main.pages.skej.draw = function (win) {
+          var page = this;
+          var data = win.state.data || new Cage({})
+          var tbar = win.navbar({right: {label: 'Queue', action: win.action('step', 'queue')}})
+          var dims = win.dims.trim(tbar.dims.height, 0, 0, 0)
+          var elem = win.content;
+
+          var Activity = Orb.type(function Activity(_, root, opts) {
+            var opts = this.opts = Sun.up({}, opts)
+            var dims = this.dims = opts.dims;
+            var elem = this.elem = root.g()
+
+            var bgd = elem.rectX(dims).style({fill: '#fff'})
+            var txt = elem.textX(dims, opts.what)
+            var ccl = elem.circleX(Sky.box(0, 0, 20, 20).align(dims, -.9, -.9))
+
+            var self = this;
+            var jack = this.jack = elem.guide(elem.wagon(null, {bbox: {y: 0, height: 0}}), {kx: 2})
+
+            var toggle;
+            ccl.tap(function () {
+              Orb.drag(jack, 'goto', toggle ? [0, 1] : [1, 0])
+              toggle = !toggle;
+            }, {stop: true})
+          })
+
+          var keys = ['Meet', 'Call', 'Coffee', 'Drink', 'Lunch', 'Dinner']
+          elem.rectX(dims).style({fill: Sky.RGB.random()})
+          dims.grid(function (a, b, i, j, n) {
+            var what = keys[n]
+            var btn = a.button(function () { win.do('open', 'who', data.update({what: what})) })
+            Activity(btn, {dims: b, what: what})
+            return a;
+          }, elem.g(), {rows: 3, cols: 2})
+
+          var drag = elem.rect(dims.x, dims.y, .1 * dims.w, dims.h).style({fill: 'rgba(0, 0, 0, .1)'})
+          drag.swipe(elem.orb({
+            grab: function () {
+              this.jack = main.back(win.state, data)
+              this.jack.grab()
+            }
+          }))
+        }
+
+        main.pages.who.draw = function (win) {
+          var page = this;
+          var data = win.state.data;
+          var tbar = win.navbar({right: {label: 'Cancel', action: win.action('shut', null) }})
+          var dims = win.dims.trim(tbar.dims.height, 0, 0, 0)
+          var elem = win.content;
+
+          elem.rectX(dims).style({fill: '#fff'})
+          elem.textX(dims, data.get('what'))
+
+          data.update({who: 'Just me'}) // XXX
+
+          var next = elem.button(function () {
+            // wait for make_request
+            win.do('step', 'when', data)
+          }).style({fill: 'blue'})
+          next.textX(dims.shift(0, 30), 'Next')
+        }
+
+        main.pages.when.draw = function (win) {
+          var page = this;
+          var data = win.state.data;
+          var tbar = win.navbar({right: {label: 'Cancel', action: win.action('shut', null)}})
+          var dims = win.dims.trim(tbar.dims.height, 0, 0, 0)
+          var elem = win.content;
+
+          elem.rectX(dims).style({fill: '#fff'})
+          elem.textX(dims, data.get('who'))
+
+          data.update({when: new Date}) // XXX
+
+          var next = elem.button(win.action('step', 'where', data)).style({fill: 'blue'})
+          next.textX(dims.shift(0, 30), 'Next')
+        }
+
+        main.pages.where.draw = function (win) {
+          var page = this;
+          var data = win.state.data;
+          var tbar = win.navbar({right: {label: 'Cancel', action: win.action('shut', null)}})
+          var dims = win.dims.trim(tbar.dims.height, 0, 0, 0)
+          var elem = win.content;
+
+          elem.rectX(dims).style({fill: '#fff'})
+          elem.textX(dims, data.get('when'))
+
+          data.update({where: 'Palo Alto'}) // XXX
+
+          var next = elem.button(win.action('step', 'review', data)).style({fill: 'blue'})
+          next.textX(dims.shift(0, 30), 'Next')
+        }
+
+        main.pages.review.draw = function (win) {
+          var page = this;
+          var data = win.state.data;
+          var tbar = win.navbar({right: {label: 'Cancel', action: win.action('shut', null)}})
+          var dims = win.dims.trim(tbar.dims.height, 0, 0, 0)
+          var elem = win.content;
+
+          elem.rectX(dims).style({fill: '#fff'})
+          elem.textX(dims, data.get('where'))
+
+          var next = elem.button(function () {
+            // wait for make_proposal
+            win.do('shut', data)
+          }).style({fill: 'blue'})
+          next.textX(dims.shift(0, 30), 'Skej')
+        }
+
+        main.pages.queue.draw = function (win) {
+          var tbar = win.navbar()
+          var dims = win.dims.trim(tbar.dims.height, 0, 0, 0)
+          var elem = win.content;
+          elem.rectX(dims).style({fill: Sky.RGB.random()})
+          elem.tap(win.action('reload', win.state.data))
+        }
+
+        main.launch({tag: 'skej', prev: {tag: 'settings'}})
+      })();
+    </script>
+  </body>
+</html>

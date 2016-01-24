@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <title>UI Kits</title>
+    <style>
+     .umain {
+        border: 1px solid #eee;
+        border-radius: 12px;
+        color: rgb(65, 77, 107);
+        width: 800px;
+        overflow: hidden;
+     }
+
+     .umain .ibar {
+        border-right: 1px solid #eee;
+     }
+
+     .umain .ibar > div {
+        background: rgb(149, 187, 234);
+        padding: 1em;
+     }
+
+     .umain .ibar > div.active {
+        background: white;
+     }
+
+     .umain .ibar > div + div {
+        border-top: 1px solid rgb(139, 177, 224);
+     }
+
+     .umain .title-bar {
+        padding: 1em;
+     }
+
+     .umain .title-bar > div {
+        padding-right: 0.5em;
+     }
+
+     .umain .body {
+        padding: 1em 3em;
+     }
+
+     .umain .chart {
+        background: rgb(226, 225, 223);
+     }
+    </style>
+    <script src="all"></script>
+    <script>
+     window.onload = function () {
+       var Q = Sky.units, U = Sky.util;
+       var blue = Sky.rgb(65, 77, 107)
+       var body = Sky.$(document.body)
+
+       var unity = body.g()
+       var umain = unity.row(['fit', '70%', '30%']).addClass('umain')
+       var ibar = umain.nth(0).flex(['fit', 'fit', 'fit', 'fit']).addClass('ibar')
+       ibar.each('div', function (_, node, i) {
+         var e = Sky.$(node).txt('icon')
+         if (i == 0)
+           e.addClass('active')
+       })
+
+       var board = umain.nth(1).flex(['fit', '100%']).addClass('board')
+       var title = board.nth(0).flex(['100%', 'fit'], true).addClass('title-bar')
+       title.nth(0).txt('Geekboard')
+       title.nth(1).txt('icon')
+
+       var body = board.nth(1).flex(['50%', '50%', 'fit'], true).addClass('body')
+       var pie1 = body.nth(0).flex(['100%', 'fit'])
+       pie1.nth(0).style({'position': 'relative'}).circle(50, 50, 40).style(Q({backgroundColor: blue}))
+       pie1.nth(1).txt('label')
+       var pie2 = body.nth(1).flex(['100%', 'fit'])
+       pie2.nth(0).style({'position': 'relative'}).circle(50, 50, 40).style(Q({backgroundColor: blue}))
+       pie2.nth(1).txt('label')
+       var stat = body.nth(2).flex(['50%', '50%'])
+       stat.nth(0).txt('stat')
+       stat.nth(1).txt('stat')
+
+       var chart = umain.nth(2).flex(['fit', '100%']).addClass('chart')
+       var title = chart.nth(0).flex(['100%', 'fit'], true).addClass('title-bar')
+       title.nth(0).txt('Daily load')
+       title.nth(1).txt('icon')
+
+       var body = chart.nth(1).flex(['fit', 15, '100%']).addClass('body')
+       body.nth(0).txt('751 users')
+       body.nth(2).style({backgroundColor: blue})
+     }
+    </script>
+  </head>
+  <body></body>
+</html>
