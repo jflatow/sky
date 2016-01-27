@@ -59,6 +59,7 @@ test('val', function (t) {
 })
 
 test('fold', function (t) {
+  t.deepEqual(Sun.fold(L.append, [], undefined), [])
   t.deepEqual(Sun.fold(L.append, [], {'k': 'v'}), [['k', 'v']])
   t.deepEqual(Sun.fold(L.append, [], ['k', 'v']), ['k', 'v'])
   t.deepEqual(Sun.fold(L.append, [], [['k', 'v']]), [['k', 'v']])
@@ -166,5 +167,11 @@ test('select', function (t) {
 test('values', function (t) {
   t.deepEqual(Sun.values({a: 'b', 'c': 'd'}), ['b', 'd'])
   t.deepEqual(Sun.values([['a', 'b'], 'x', ['c', 'd']]), ['b', 'x', 'd'])
+  t.end()
+})
+
+test('L.repeat', function (t) {
+  t.deepEqual(L.repeat(['a', 'b', 'c'], 3), ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'])
+  t.deepEqual(L.repeat([], 10), [])
   t.end()
 })

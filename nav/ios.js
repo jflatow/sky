@@ -115,22 +115,22 @@ var iOS7x = UFO.derive({
 
       if (left) {
         var lbtn = this.lbtn = elem.button(function () { left.action() }).addClass('left')
-        lbtn.text(x + 3 * q, m, left.label).anchor(-1, 0)
+        lbtn.text(left.label).xy(x + 3 * q, m).anchor(-1, 0)
         lbtn.rectX(b[0]).order(0)
       } else if (prev) {
         var back = this.back = elem.button(function () { win.action('back')(state.data) }).addClass('back')
         back.chevron(x + 3 * q, m, -2 * q)
-        back.text(x + 5 * q, m, nav.pages[prev.tag].title).anchor(-1, 0)
+        back.text(nav.pages[prev.tag].title).xy(x + 5 * q, m).anchor(-1, 0)
         back.rectX(b[0]).order(0)
       }
       if (right) {
         var rbtn = this.rbtn = elem.button(function () { right.action() }).addClass('right')
-        rbtn.text(dims.right - 3 * q, m, right.label).anchor(1, 0)
+        rbtn.text(right.label).xy(dims.right - 3 * q, m).anchor(1, 0)
         rbtn.rectX(b[2]).order(0)
       }
 
       var tbar = this.tbar = elem.g()
-      tbar.text(dims.midX, m, title).anchor(0, 0).addClass('title')
+      tbar.text(title).xy(dims.midX, m).anchor(0, 0).addClass('title')
 
       win.plugs.push({
         move: function (px) {

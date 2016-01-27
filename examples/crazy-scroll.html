@@ -86,7 +86,7 @@
               wrap: function (wx) { v.txt(i += wx * N) }
             })
             var t = q.rect(0, 0, 50, 50).attrs({fill: 'white', stroke: 'black'})
-            var v = q.text(25, 25, i).attrs({'text-anchor': 'middle'})
+            var v = q.text(i).xy(25, 25).attrs({'text-anchor': 'middle'})
             var z = q.transform({translate: [i * 50 + 120, 20]}).wagon(l, {bbox: {y: 20, height: 0}})
             q.tap(function () { console.log(i) })
             z.move(0, 0)
@@ -186,8 +186,8 @@
         //dolly.setOpts({bbox: {x: dim.x, y: dim.y - dim.h / 2, width: dim.w, height: 2 * dim.h}})
         ds = svg.spring(dolly)
         svg.swipe(ds)
-        svg.text(0, 0, 'origin')
-        svg.text(dim.x + dim.w, dim.y + dim.h, 'bbox')
+        svg.text('origin')
+        svg.text('bbox').xy(dim.x + dim.w, dim.y + dim.h)
 
         svg.once('ok', function () { console.log('bubbled!') })
         svg.dbltap(function () { console.log(this, arguments) })

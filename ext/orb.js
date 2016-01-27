@@ -93,7 +93,7 @@ Sky.Elem.prototype.update({
 
   dbltap: function (fun, opts) {
     var opts = up({gap: 250}, opts)
-    var self= this, taps = 0;
+    var self = this, taps = 0;
     this.on(pointerdown, function (e) {
       if (taps++)
         fun && fun.apply(self, arguments)

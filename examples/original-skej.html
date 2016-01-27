@@ -72,8 +72,8 @@
         /* XXX */
         elem.rect(x, y, w, h).attrs({fill: 'rgba(0, 0, 0, .8)'});
         // observe user name / status
-        elem.text(dims.left, dims.midY, '\u2731 Jared Flatow').attrs({fill: 'white', dx: 4, dy: 3});
-        elem.text(dims.right, dims.midY, '\u267a').attrs({fill: 'white', dx: -14, dy: 3});
+        elem.text('\u2731 Jared Flatow').xy(dims.left, dims.midY).attrs({fill: 'white', dx: 4, dy: 3});
+        elem.text('\u267a').xy(dims.right, dims.midY).attrs({fill: 'white', dx: -14, dy: 3});
       }),
 
       timepiece: Orb.type(function TimePiece(W, app, opts) {
@@ -163,8 +163,8 @@
           var self = this;
 
           var bg = elem.rect(z.x, z.y, tile.w, tile.h).attrs({fill: 'rgb(0, 0, 100)', 'fill-opacity': .5});
-          var dt = elem.text(z.midX, z.midY, '').attrs({dy: -4, 'text-anchor': 'middle'});
-          var wd = elem.text(z.midX, z.midY, '').attrs({dy: 10, 'text-anchor': 'middle'});
+          var dt = elem.text().xy(z.midX, z.midY).attrs({dy: -4, 'text-anchor': 'middle'});
+          var wd = elem.text().xy(z.midX, z.midY).attrs({dy: 10, 'text-anchor': 'middle'});
 
           this.time = t;
           this.jack = elem.wagon(elem.loop(null, {
@@ -189,7 +189,7 @@
 
           var p = this.prev = elem.g().transform({translate: [0, tile.y - tile.h - 1]});
           p.rect(z.x, z.y, tile.x, tile.h).attrs({fill: 'rgba(0, 0, 0, .8)'});
-          p.text(z.right, z.midY, '\u2190').attrs({dy: 6, fill: 'white', 'text-anchor': 'middle', 'font-size': 20});
+          p.text('\u2190').xy(z.right, z.midY).attrs({dy: 6, fill: 'white', 'text-anchor': 'middle', 'font-size': 20});
           p.press(p.spring({
             grab: function () { passTime({m: -1}) },
             move: function (dx, dy, s) {
@@ -200,7 +200,7 @@
 
           var n = this.next = elem.g().transform({translate: [tile.x + tile.w, tile.y - tile.h - 1]});
           n.rect(z.x, z.y, tile.x, tile.h).attrs({fill: 'rgba(0, 0, 0, .8)'});
-          n.text(z.x + z.w, z.midY, '\u2192').attrs({dy: 6, fill: 'white', 'text-anchor': 'middle', 'font-size': 20});
+          n.text('\u2192').xy(z.x + z.w, z.midY).attrs({dy: 6, fill: 'white', 'text-anchor': 'middle', 'font-size': 20});
           n.press(n.spring({
             grab: function () { passTime({m: +1}) },
             move: function (dx, dy, s) {
@@ -212,8 +212,8 @@
           var pct;
           var m = this.month = elem.g();
           var bg = m.rect(z.x, z.y, tile.w, tile.h).attrs({fill: 'rgb(0, 0, 255)'});
-          var mo = m.text(z.midX, z.midY, '').attrs({dy: -4, 'text-anchor': 'middle'});
-          var yr = m.text(z.midX, z.midY, '').attrs({dy: 10, 'text-anchor': 'middle'});
+          var mo = m.text().xy(z.midX, z.midY).attrs({dy: -4, 'text-anchor': 'middle'});
+          var yr = m.text().xy(z.midX, z.midY).attrs({dy: 10, 'text-anchor': 'middle'});
           m.tap(function () { Orb.move(monthView, 0, pct == 1 ? -H : H) });
 
           this.jack = elem.orb({
@@ -238,7 +238,7 @@
 
           var week = Sky.box(dims.left, dims.bottom - H, w, .1 * H).grid(function (c, tile, i, j) {
             elem.rect(tile.x, tile.y, tile.w, tile.h).attrs({fill: 'rgba(0, 255, 0, .9)'});
-            elem.text(tile.midX, tile.midY, T.DoW[j].substr(0, 3)).attrs({dy: 2, 'text-anchor': 'middle'});
+            elem.text(T.DoW[j].substr(0, 3)).xy(tile.midX, tile.midY).attrs({dy: 2, 'text-anchor': 'middle'});
           }, null, {cols: 7});
 
           var grid = Sky.box(dims.left, dims.bottom - .9 * H, w, .9 * H).grid(function (c, tile, i, j, n, b) {
@@ -246,7 +246,7 @@
             var cell = {
               bg: bg.rect(tile.x, tile.y, tile.w, tile.h),
               fg: fg,
-              dt: fg.text(tile.midX, tile.midY, '').attrs({dy: 2, 'text-anchor': 'middle'})
+              dt: fg.text().xy(tile.midX, tile.midY).attrs({dy: 2, 'text-anchor': 'middle'})
             }
             g.tap(function () { gotoTime(cell.time) });
             return c.push(cell) && c;
@@ -350,7 +350,7 @@
             move: function (dx) {
               time -= 120000 * dx;
               lip.attrs({d: P.arc(cx, cy, r, r, l, o -= dx)});
-              tip.transform({translate: g.polar(r, o)});
+              tip.transform({translate: Sky.util.trig.polar(r, o)});
             }
           });
           var gear = g.crank(g.orb({
@@ -444,7 +444,7 @@
             text = 'queue';
             break;
           }
-          elem.text(cell.midX, cell.midY, text).attrs({'text-anchor': 'middle', dy: 2});
+          elem.text(text).xy(cell.midX, cell.midY).attrs({'text-anchor': 'middle', dy: 2});
           console.log(cell, i, j);
         }, null, {cols: 3});
       }),

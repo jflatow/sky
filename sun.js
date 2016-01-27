@@ -114,10 +114,10 @@ var first = function (o, f) {
 
 var fold = function (f, a, o) {
   if (o instanceof Array)
-    for (var k in o)
-      a = f(a, o[k], k, o)
+    for (var i = 0; i < o.length; i++)
+      a = f(a, o[i], i, o)
   else
-    for (var k in o)
+    for (var ks = Object.keys(def(o, {})), i = 0, k = ks[i]; i < ks.length; k = ks[++i])
       a = f(a, [k, o[k]], k, o)
   return a;
 }
@@ -335,31 +335,34 @@ up(Sun.Cage.prototype, {
     return this;
   },
 
-  on: function (keys, fun) {
-    var fns = this.__fns__, sep = this.__opt__.sep;
-    keys.split(sep).map(function (k) { L.keep(fns[k] = fns[k] || [], fun) })
+  on: function (keys, fun, now) {
+    var fns = this.__fns__, keys = keys.split(this.__opt__.sep), self = this;
+    keys.map(function (k) { L.keep(fns[k] = fns[k] || [], fun) })
+    if (now)
+      keys.map(function (k) { var v = self[k]; fun.call(self, v, v, k) })
     return this;
   },
   off: function (keys, fun) {
-    var fns = this.__fns__, sep = this.__opt__.sep;
-    keys.split(sep).map(function (k) { L.drop(fns[k] || [], fun) })
+    var fns = this.__fns__, keys = keys.split(this.__opt__.sep)
+    keys.map(function (k) { L.drop(fns[k] || [], fun) })
     return this;
   },
-  once: function (keys, fun) {
+  once: function (keys, fun, now) {
     var n = 0;
-    return this.til(keys, fun, function () { return n++ })
+    return this.til(keys, fun, function () { return n++ }, now)
   },
-  til: function (keys, fun, dead) {
+  til: function (keys, fun, dead, now) {
     this.on(keys, function () {
       if (dead())
         this.off(keys, arguments.callee)
       else
         fun.apply(this, arguments)
-    })
+    }, now)
   },
   trigger: function (key, val, old) {
-    var self = this;
-    return (self.__fns__[key] || []).map(function (f) { f.call(self, val, old, key) })
+    var self = this, funs = self.__fns__[key] || []
+    funs.map(function (f) { f.call(self, val, old, key) })
+    return this;
   },
   toggle: function (key) {
     return this.change(key, !this[key])
@@ -469,6 +472,12 @@ var L = Sun.list = up(function (x) {
       }
     }
     return z;
+  },
+  repeat: function (list, n) {
+    var l = []
+    for (var i = 0; i < n; i++)
+      l = l.concat(list)
+    return l;
   },
 
   cmp: function (x, y) {

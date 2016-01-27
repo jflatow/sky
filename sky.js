@@ -39,7 +39,8 @@ var trig = util.trig = {
   rad: function (a) { return Math.PI / 180 * a },
   sin: function (a) { return Math.sin(trig.rad(a)) },
   cos: function (a) { return Math.cos(trig.rad(a)) },
-  cut: function (x) { return util.clip(x, -359.999, 359.999) }
+  cut: function (x) { return util.clip(x, -359.999, 359.999) },
+  polar: function (r, a) { return [r * trig.cos(a), r * trig.sin(a)] }
 }
 
 var path = function (cmd) { return cmd + [].slice.call(arguments, 1) }
@@ -430,6 +431,9 @@ Elem.prototype.update({
     return this;
   },
 
+  href: function (href) {
+    return this.attrs({href: href})
+  },
   space: function (space) {
     return this.attrs({space: space}, this.xml)
   },
@@ -467,12 +471,18 @@ Elem.prototype.update({
   },
   addRules: function (rules) {
     var i = 0, sheet = this.node.sheet;
-    for (var selector in rules) {
-      var rule = rules[selector], str = ''
-      for (var property in rule)
-        str += property + ': ' + rule[property] + ';'
-      sheet.insertRule(selector + '{' + str + '}', i++)
+    var rec = function (sel, rule, str) {
+      var str = str || ''
+      for (var property in rule) {
+        if (sel.match(/^@media/))
+          str += property + '{' + rec(property, rule[property]) + '}'
+        else
+          str += property + ': ' + rule[property] + ';'
+      }
+      return str;
     }
+    for (var selector in rules)
+      sheet.insertRule(selector + '{' + rec(selector, rules[selector]) + '}', i++)
     return i;
   },
 
@@ -529,6 +539,9 @@ Elem.prototype.update({
   svg: function (attrs, props) {
     return svg(up({class: 'svg'}, attrs), props).addTo(this)
   },
+  g: function (attrs, props) {
+    return this.div(attrs, props)
+  },
   hl: function (text, level) {
     return this.child('h' + (level || 1)).txt(text)
   },
@@ -553,8 +566,11 @@ Elem.prototype.update({
   input: function (attrs, props) {
     return this.child('input', attrs, props)
   },
-  image: function (x, y, w, h, href, u) {
-    return this.child('img', {class: 'image'}).attrs({src: href}).xywh(x, y, w, h, u)
+  icon: function (href, w, h, u) {
+    return this.svg({class: 'icon'}).icon(href).parent().size(w, h, u)
+  },
+  image: function (href, w, h, u) {
+    return this.child('img', {class: 'image'}).attrs({src: href}).size(w, h, u)
   },
   circle: function (cx, cy, r, u) {
     return this.div({class: 'circle'}).xywh(cx - r, cy - r, 2 * r, 2 * r, u).style(Q({borderRadius: r}, u))
@@ -565,22 +581,16 @@ Elem.prototype.update({
   rect: function (x, y, w, h, u) {
     return this.div({class: 'rect'}).xywh(x, y, w, h, u)
   },
-  text: function (x, y, text, u) {
-    return this.span({class: 'text'}).xy(x, y, u).txt(text)
-  },
-  g: function (attrs, props) {
-    return this.div(attrs, props)
-  },
-  icon: function (x, y, w, h, href, u) {
-    return this.svgX(Sky.box(x, y, w, h), u).attrs({class: 'icon'}).icon(x, y, w, h, href)
+  text: function (text) {
+    return this.span({class: 'text'}).txt(text)
   },
 
   svgX: function (box, u) {
-    return this.svg({viewBox: box}).resize(box, u)
+    return this.svg({viewBox: box}).embox(box, u)
   },
   iconX: function (box, href, u) {
     with (box || this.bbox())
-      return this.icon(x, y, w, h, href, u)
+      return this.icon(href, w, h, u).place(x, y, u)
   },
   imageX: function (box, href, u) {
     with (box || this.bbox())
@@ -600,13 +610,13 @@ Elem.prototype.update({
       return this.rect(x, y, w, h, u)
   },
   textX: function (box, text, ax, ay, u) {
-    return this.text(0, 0, text, u).align(box || this.bbox(), ax, ay)
+    return this.text(text).align(box || this.bbox(), ax, ay, u)
   },
 
   flex: function (ps, hzn, u) {
-    return ps.reduce(function (r, p) {
+    return (ps || []).reduce(function (r, p) {
       var f, q;
-      if (p == 'fit')
+      if (p == 'fit' || p == null)
         f = '0 0 auto'
       else if ((q = Q.unify('size', p, u)).substr(-1) == '%')
         f = '1 1 ' + q;
@@ -622,19 +632,12 @@ Elem.prototype.update({
     return this.g({class: 'col'}).flex(ps, false, u)
   },
 
-  anchor: function (i, j) {
-    var a = i < 0 ? 0 : (i > 0 ? -100 : -50)
-    var b = j < 0 ? 0 : (j > 0 ? -100 : -50)
-    return this.transform({translate: [a + '%', b + '%']})
-  },
   bbox: function () {
     return (new Box(this.node.getBoundingClientRect())).shift(pageXOffset, pageYOffset)
   },
-  polar: function (r, a) {
-    return [r * trig.cos(a), r * trig.sin(a)]
-  },
-  href: function (href) {
-    return this.attrs({href: href})
+
+  wh: function (w, h, u) {
+    return this.style(Q({width: w, height: h}, u))
   },
   xy: function (x, y, u) {
     return this.style(Q({left: x, top: y, position: 'absolute'}, u))
@@ -642,18 +645,35 @@ Elem.prototype.update({
   xywh: function (x, y, w, h, u) {
     return this.style(Q({left: x, top: y, width: w, height: h, position: 'absolute'}, u))
   },
-  put: function (ax, ay, u) {
+
+  size: function (w, h, u) {
+    return this.parent().wh.call(this, w, h, u)
+  },
+  place: function (x, y, u) {
+    return this.parent().xy.call(this, x, y, u)
+  },
+  cover: function (x, y, w, h, u) {
+    return this.parent().xywh.call(this, x, y, w, h, u)
+  },
+
+  align: function (box, ax, ay, u) {
+    with (Sky.box().align(box, ax, ay))
+      return this.place(x, y, u).anchor(ax, ay)
+  },
+  embox: function (box, u) {
+    with (box)
+      return this.cover(x, y, w, h, u)
+  },
+
+  anchor: function (i, j) {
+    var a = i < 0 ? 0 : (i > 0 ? -100 : -50)
+    var b = j < 0 ? 0 : (j > 0 ? -100 : -50)
+    return this.transform({translate: [a + '%', b + '%']})
+  },
+  hang: function (ax, ay, u) {
     return this.align(Sky.box(0, 0, 100, 100), ax, ay, up({top: '%', left: '%'}, u))
   },
-  align: function (box, ax, ay, u) {
-    return this.place(Sky.box().align(box, ax, ay), u).anchor(ax, ay)
-  },
-  place: function (box, u) {
-    return this.parent().xy.call(this, box.x, box.y, u)
-  },
-  resize: function (box, u) {
-    return this.parent().xywh.call(this, box.x, box.y, box.w, box.h, u)
-  },
+
   screen: function (x, y) {
     return {x: x, y: y}
   },
@@ -714,8 +734,8 @@ SVGElem.prototype = new Elem().update({
   rect: function (x, y, w, h) {
     return this.child('rect', {x: x, y: y, width: w, height: h})
   },
-  text: function (x, y, text) {
-    return this.child('text', {x: x, y: y}, {textContent: text})
+  text: function (text) {
+    return this.child('text', {}, {textContent: text})
   },
   tspan: function (text) {
     return this.child('tspan', {}, {textContent: text})
@@ -723,8 +743,11 @@ SVGElem.prototype = new Elem().update({
   g: function (attrs, props) {
     return this.child('g', attrs, props)
   },
-  image: function (x, y, w, h, href) {
-    return this.child('image').href(href).xywh(x, y, w, h)
+  icon: function (href, w, h) {
+    return this.use(href).wh(w, h)
+  },
+  image: function (href, w, h) {
+    return this.child('image').href(href).wh(w, h)
   },
   use: function (href) {
     return this.child('use').href(href)
@@ -734,9 +757,6 @@ SVGElem.prototype = new Elem().update({
   },
   clipPath: function (attrs, props) {
     return this.child('clipPath', attrs, props)
-  },
-  icon: function (x, y, w, h, href) {
-    return this.use(href).xywh(x, y, w, h)
   },
 
   border: function (t, r, b, l, box) {
@@ -759,6 +779,9 @@ SVGElem.prototype = new Elem().update({
   },
   href: function (href) {
     return this.attrs({href: href}, this.xlink)
+  },
+  wh: function (w, h) {
+    return this.attrs({width: w, height: h})
   },
   xy: function (x, y) {
     return this.attrs({x: x, y: y})
