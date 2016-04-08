@@ -105,8 +105,8 @@ test('count', function (t) {
 })
 
 test('lookup', function (t) {
-  t.deepEqual(Sun.lookup(null, 'x'), undefined)
-  t.deepEqual(Sun.lookup({x: {y: 'z'}}, 'x'), {y: 'z'})
+  t.deepEqual(Sun.lookup(null, ['x']), undefined)
+  t.deepEqual(Sun.lookup({x: {y: 'z'}}, ['x']), {y: 'z'})
   t.deepEqual(Sun.lookup({x: {y: 'z'}}, ['x', 'y']), 'z')
   t.deepEqual(Sun.lookup({x: {y: 'z'}}, ['x', 'y', 0]), 'z')
   t.deepEqual(Sun.lookup({x: {y: 'z'}}, ['x', 'y', 'z']), undefined)
@@ -114,21 +114,21 @@ test('lookup', function (t) {
 })
 
 test('modify', function (t) {
-  t.deepEqual(Sun.modify(null, 'x'), {x: undefined})
+  t.deepEqual(Sun.modify(null, ['x']), {x: undefined})
   t.deepEqual(Sun.modify({}, ['p', 'a', 't', 'h'], true), {p: {a: {t: {h: true}}}})
   t.deepEqual(Sun.modify([], ['p', 'a', 't', 'h'], true), [['p', {a: {t: {h: true}}}]])
   t.deepEqual(Sun.modify([], ['p', 'a', 't', 'h'], true, []), [['p', [['a', [['t', [['h', true]]]]]]]])
   t.deepEqual(Sun.modify({}, ['a', 'b'], function () { return 3 }), {a: {b: 3}})
   t.deepEqual(Sun.modify({a: {b: 3}}, ['a', 'b'], function (x) { return x * 10 }), {a: {b: 30}})
-  t.deepEqual(Sun.modify({a: 3}, 'a', function (x) { return x + 3 }), {a: 6})
+  t.deepEqual(Sun.modify({a: 3}, ['a'], function (x) { return x + 3 }), {a: 6})
   t.end()
 })
 
 test('remove', function (t) {
-  t.deepEqual(Sun.remove(null, 'x'), null)
-  t.deepEqual(Sun.remove({}, 'x'), {})
-  t.deepEqual(Sun.remove([], 'x'), [])
-  t.deepEqual(Sun.remove({x: 1}, 'x'), {})
+  t.deepEqual(Sun.remove(null, ['x']), {})
+  t.deepEqual(Sun.remove({}, ['x']), {})
+  t.deepEqual(Sun.remove([], ['x']), [])
+  t.deepEqual(Sun.remove({x: 1}, ['x']), {})
   t.deepEqual(Sun.remove({x: {y: [['z', 1]]}}, ['x', 'y', 'z']), {x: {y: []}})
   t.deepEqual(Sun.remove([['x', [['y', {'z': true}]]]], ['x', 'y', 'z']), [['x', [['y', {}]]]])
   t.deepEqual(Sun.remove({x: ['y']}, ['x']), {})

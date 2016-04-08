@@ -29,7 +29,7 @@ var nil = function (x) {
   if (typeof(x) == 'string')
     return ''
   if (typeof(x) == 'number')
-    return 0
+    return 0;
 }
 var pad = function (s, opt) {
   var s = s + '', w = opt && opt.width || 2, p = opt && opt.pad || '0';
@@ -219,31 +219,30 @@ var Sun = module.exports = {
   },
 
   lookup: function (obj, path) {
-    var path = L(path)
     if (path.length == 1)
       return get(def(obj, {}), path[0])
     if (path.length)
       return Sun.lookup(get(def(obj, {}), path[0]), path.slice(1))
+    return obj;
   },
 
   modify: function (obj, path, val, empty) {
-    var path = L(path), empty = def(nil(empty), {})
+    var empty = def(nil(empty), {})
     var fun = (val instanceof Function) ? val : function () { return val }
     var obj = def(obj, empty)
     if (path.length == 1)
       return set(obj, path[0], fun(get(obj, path[0])))
     if (path.length)
       return set(obj, path[0], Sun.modify(get(obj, path[0]), path.slice(1), fun, empty))
-    return obj;
+    return val;
   },
 
   remove: function (obj, path) {
-    var path = L(path)
     if (path.length == 1)
-      del(def(obj, {}), path[0])
+      return del(def(obj, {}), path[0])
     else if (path.length)
-      Sun.remove(get(obj, path[0]), path.slice(1))
-    return obj;
+      return set(obj, path[0], Sun.remove(get(obj, path[0]), path.slice(1)))
+    return nil(obj)
   },
 
   object: function (iter) {
@@ -292,6 +291,10 @@ var Sun = module.exports = {
   }
 }
 
+// derive: copy the constructor with an extended prototype
+// extend: change the constructor prototype in-place
+// subcls: change the constructor function and use an extended prototype
+
 var derive = function (cons, args) {
   var copy = function () { return cons.apply(this, arguments) }
   return extend(cls(copy), cat(cons.prototype, args))
@@ -317,6 +320,11 @@ Sun.Cage = function Cage(obj, opt) {
   return this;
 }
 up(Sun.Cage.prototype, {
+  fire: function (k, v, o) {
+    var self = this, funs = self.__fns__[k] || []
+    funs.map(function (f) { f.call(self, v, o, k) })
+    return this;
+  },
   get: function (k, d) {
     if (k in this.__obj__)
       return this.__obj__[k]
@@ -326,7 +334,7 @@ up(Sun.Cage.prototype, {
   change: function (k, v) {
     var u = this.__obj__[k]
     this.__obj__[k] = v;
-    this.trigger(k, v, u)
+    this.fire(k, v, u)
     return v;
   },
   update: function (obj) {
@@ -358,11 +366,6 @@ up(Sun.Cage.prototype, {
       else
         fun.apply(this, arguments)
     }, now)
-  },
-  trigger: function (key, val, old) {
-    var self = this, funs = self.__fns__[key] || []
-    funs.map(function (f) { f.call(self, val, old, key) })
-    return this;
   },
   toggle: function (key) {
     return this.change(key, !this[key])

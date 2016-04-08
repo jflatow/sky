@@ -1,6 +1,6 @@
 var test = require('tape')
-var UFO = require('../nav/ufo')
-var iOS = require('../nav/ios')
+var UFO = require('../kit/ufo')
+var iOS = require('../kit/ios')
 
 var NP = UFO.Nav.prototype;
 

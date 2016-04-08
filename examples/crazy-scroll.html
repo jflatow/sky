@@ -191,8 +191,8 @@
 
         svg.once('ok', function () { console.log('bubbled!') })
         svg.dbltap(function () { console.log(this, arguments) })
-        bgd.trigger('ok', null, {bubbles: true})
-        bgd.trigger('ok', null, {bubbles: true})
+        bgd.fire('ok', null, {bubbles: true})
+        bgd.fire('ok', null, {bubbles: true})
 
         d = false;
         x = new Sun.Cage;

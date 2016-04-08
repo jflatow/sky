@@ -27,7 +27,34 @@ var Orb = Sun.cls(function Orb(obj, jack, elem) {
   sync: function () { return this.prop('sync', arguments) },
   drag: function (f, a) { return Orb.drag(this, f, a) },
   walk: function (f, a) { return Orb.walk(this, f, a) },
-  thru: function (o, a) { return Orb.thru(this, o, a) }
+  thru: function (o, a) { return Orb.thru(this, o, a) },
+  load: function (json) {
+    var path = this.path || []
+    var part = Sun.lookup(json || {}, path)
+    if (this.kids)
+      this.kids.reduce(function (o, k) { return k.load(o), o }, part)
+    else
+      this.elem.load(part)
+    return this;
+  },
+  dump: function (json) {
+    var path = this.path || []
+    var part = Sun.lookup(json || {}, path)
+    if (this.kids)
+      part = this.kids.reduce(function (o, k) { return k.dump(o) }, part)
+    else
+      part = this.elem.dump(part)
+    return Sun.modify(json, path, part)
+  },
+  hide: function (b) { this.elem && this.elem.hide(b); return this; },
+  show: function (b) { this.elem && this.elem.show(b); return this; },
+  activate: function (b) { return this.elem && this.elem.activate(b) },
+  collapse: function (b) { return this.elem && this.elem.collapse(b) },
+  validate: function (b) {
+    if (this.kids)
+      return this.kids.reduce(function (a, k) { return k.validate(a) }, dfn(b, true))
+    return this.elem && this.elem.validate(b)
+  }
 })
 Orb = module.exports = up(Orb, {
   do: function (o, f, a) {

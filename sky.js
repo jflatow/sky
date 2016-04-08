@@ -6,7 +6,8 @@ var fnt = function (x, d) { return isFinite(x) ? x : d }
 var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
 var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
 var pre = function (a, k, d) { return a[k] = get(a, k, d) }
-var map = function (a, f) { return a && a.map ? a.map(f) : f(a) }
+var map = function (a, f) { return [].concat(a || []).map(f) }
+var each = function (a, f) { return a && a.map ? a.map(f) : f(a) }
 var wrap = function (node) {
   if (node)
     switch (node.namespaceURI) {
@@ -159,16 +160,16 @@ var Q = up(units, {
   },
   unify: function (k, v, u) {
     var u = u || Q.defaults, d = u[k] || '';
-    return map(v, function (x) { return isFinite(x) ? x + d : x })
+    return each(v, function (x) { return isFinite(x) ? x + d : x })
   },
   strip: function (k, v, u) {
     var u = u || Q.defaults, d = u[k], n = d && d.length;
     if (d)
-      return map(v, function (x) { return x.substr(-n) == d ? parseFloat(x) : x })
+      return each(v, function (x) { return x.substr(-n) == d ? parseFloat(x) : x })
     return v;
   },
   each: function (ks, o, u) {
-    return map(ks, function (k) { return Q.unify(k, o[k], u) })
+    return each(ks, function (k) { return Q.unify(k, o[k], u) })
   },
   rect: function (b, u) {
     return 'rect(' + Q.each(['top', 'right', 'bottom', 'left'], b, u) + ')'
@@ -382,7 +383,14 @@ Elem.prototype.update({
     return this.node.ownerDocument ? new Elem(this.node.ownerDocument) : this;
   },
   each: function (sel, fun, acc) {
-    return [].reduce.call(this.node.querySelectorAll(sel), fun, acc) || this;
+    for (var Q = this.node.querySelectorAll(sel), i = 0; i < Q.length; i++)
+      acc = fun(Q[i], acc, i, Q)
+    return acc;
+  },
+  fold: function (fun, acc) {
+    for (var c = this.node.firstElementChild, i = 0; c; c = c.nextSibling)
+      acc = fun(acc, c, i++)
+    return acc;
   },
   nth: function (n) {
     var c = this.node.children, C = c.length;
@@ -405,8 +413,24 @@ Elem.prototype.update({
     return this.$(q) || fun(this)
   },
 
-  hide: function (b) { return this.attrs({hidden: b || b == undefined ? '' : null}) },
-  show: function (b) { return this.attrs({hidden: b || b == undefined ? null : ''}) },
+  hide: function (b) { return this.attrs({hidden: dfn(b, false) ? '' : null}) },
+  show: function (b) { return this.attrs({hidden: dfn(b, true) ? null : ''}) },
+  activate: function (b) { return this.instate(b, 'activated') },
+  collapse: function (b) { return this.instate(b, 'collapsed') },
+  validate: function (b) {
+    var n = this.node, v;
+    if (n.checkValidity) {
+      if (v = !n.checkValidity())
+        b = v;
+      this.instate(v, 'invalidated')
+    }
+    return this.fold(function (a, c) { return Sky.elem(c).validate(a) }, dfn(b, true))
+  },
+  instate: function (b, c, d) {
+    var b = dfn(b, true)
+    return this.toggleClass(c, b).fire(c, up({value: b}, d), {bubbles: true})
+  },
+
   attr: function (name, ns) {
     return this.node.getAttributeNS(ns || null, name)
   },
@@ -465,6 +489,11 @@ Elem.prototype.update({
       node.removeAttribute('class')
     return this;
   },
+  toggleClass: function (cls, b) {
+    if (dfn(b, !this.hasClass(cls)))
+      return this.addClass(cls)
+    return this.removeClass(cls)
+  },
   css: function (k) {
     var css = getComputedStyle(this.node)
     return k ? css[k] : css;
@@ -495,11 +524,23 @@ Elem.prototype.update({
     })
     return this;
   },
+  apply: function (a) {
+    if (typeof(a) == 'string')
+      return this.txt(a)
+    return this[a[0]].apply(this, a.slice(1))
+  },
   bind: function (name) {
     var fun = this[name]
     return fun.bind.apply(fun, [this].concat([].slice.call(arguments, 1)))
   },
+  map: function (l, f) {
+    return map(f ? map(l, [].concat.bind([f])) : l, this.apply.bind(this))
+  },
 
+  fire: function (type, data, opts) {
+    this.node.dispatchEvent(new CustomEvent(type, up({detail: data}, opts)))
+    return this;
+  },
   on: function (types, fun, capture) {
     var node = this.node;
     types.split(/\s+/).map(function (type) {
@@ -512,10 +553,6 @@ Elem.prototype.update({
     types.split(/\s+/).map(function (type) {
       node.removeEventListener(type, fun, capture)
     })
-    return this;
-  },
-  trigger: function (type, data, opts) {
-    this.node.dispatchEvent(new CustomEvent(type, up({detail: data}, opts)))
     return this;
   },
   upon: function (types, fun, capture) {
@@ -536,12 +573,6 @@ Elem.prototype.update({
     })
   },
 
-  svg: function (attrs, props) {
-    return svg(up({class: 'svg'}, attrs), props).addTo(this)
-  },
-  g: function (attrs, props) {
-    return this.div(attrs, props)
-  },
   hl: function (text, level) {
     return this.child('h' + (level || 1)).txt(text)
   },
@@ -560,11 +591,12 @@ Elem.prototype.update({
   span: function (attrs, props) {
     return this.child('span', attrs, props)
   },
-  form: function (attrs, props) {
-    return this.child('form', attrs, props)
+
+  svg: function (attrs, props) {
+    return svg(attrs, props).addTo(this)
   },
-  input: function (attrs, props) {
-    return this.child('input', attrs, props)
+  g: function (attrs, props) {
+    return this.div(attrs, props)
   },
   icon: function (href, w, h, u) {
     return this.svg({class: 'icon'}).icon(href).parent().size(w, h, u)
@@ -699,6 +731,60 @@ Elem.prototype.update({
       tx[k] = Q.strip(k, v, u)
     }
     return tx;
+  },
+
+  load: function (json) {
+    var n = this.node, t = n.type;
+    if (json !== undefined) {
+      if (t == 'button' || t == 'reset' || t == 'submit')
+        return this;
+      else if (t == 'select-one' || t == 'select-multiple')
+        this.each('option', function (o) {
+          if ([].some.call([].concat(json), function (v) { return v == o.value }))
+            o.selected = true;
+        })
+          else if (t == 'checkbox')
+            n.checked = [].some.call([].concat(json), function (v) { return v == n.value })
+      else if (t == 'radio')
+        n.checked = json == n.value;
+      else if (n.value !== undefined)
+        n.value = json || ''
+      else if (n.childElementCount)
+        this.fold(function (_, c) {
+          Sky.elem(c).load(c.name ? json[c.name] : json)
+        })
+    }
+    return this;
+  },
+
+  dump: function (json) {
+    var json = json || {}
+    var n = this.node, t = n.type, p = n.name && json[n.name]
+    if (t == 'button' || t == 'reset' || t == 'submit')
+      return json;
+    else if (t == 'select-one')
+      p = this.each('option', function (o, v) {
+        return (o.selected) ? o.value : v;
+      }, null)
+    else if (t == 'select-multiple')
+      p = this.each('option', function (o, l) {
+        return (o.selected && l.push(o.value)), l;
+      }, []);
+    else if (t == 'checkbox')
+      p = n.checked ? (p || []).concat(n.value) : (p || [])
+    else if (t == 'radio')
+      p = n.checked ? n.value : p;
+    else if (t == 'number' || t == 'range')
+      p = dfn(n.valueAsNumber, null)
+    else
+      p = n.value;
+    if (p !== undefined)
+      return n.name ? ((json[n.name] = p), json) : p;
+    if (n.childElementCount)
+      return this.fold(function (o, c) {
+        return Sky.elem(c).dump(o)
+      }, n.name ? pre(json, n.name, {}) : json)
+    return json;
   }
 })
 
@@ -757,6 +843,9 @@ SVGElem.prototype = new Elem().update({
   },
   clipPath: function (attrs, props) {
     return this.child('clipPath', attrs, props)
+  },
+  symbol: function (attrs, props) {
+    return this.child('symbol', attrs, props)
   },
 
   border: function (t, r, b, l, box) {

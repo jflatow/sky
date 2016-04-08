@@ -5,12 +5,12 @@ var UFO = require('./ufo')
 var P = Sky.path, up = Sun.up;
 
 Sky.Elem.prototype.update({
-  button: function (fun, opts, jack) {
-    return this.g({class: 'button'}).tap(fun, opts, jack)
-  },
   chevron: function (cx, cy, w, h, t) {
     var box = Sky.box(0, 0, Math.abs(w), Math.abs(h || 2 * w))
     return this.svgX(box.center(cx, cy)).chevron(cx, cy, w, h, t)
+  },
+  trigger: function (fun, opts, jack) {
+    return this.g({class: 'trigger'}).tap(fun, opts, jack)
   }
 })
 
@@ -114,17 +114,17 @@ var iOS7x = UFO.derive({
       var bgrd = this.bgrd = elem.rect(x, y, w, h)
 
       if (left) {
-        var lbtn = this.lbtn = elem.button(function () { left.action() }).addClass('left')
+        var lbtn = this.lbtn = elem.trigger(function () { left.action() }).addClass('left')
         lbtn.text(left.label).xy(x + 3 * q, m).anchor(-1, 0)
         lbtn.rectX(b[0]).order(0)
       } else if (prev) {
-        var back = this.back = elem.button(function () { win.action('back')(state.data) }).addClass('back')
+        var back = this.back = elem.trigger(function () { win.action('back')(state.data) }).addClass('back')
         back.chevron(x + 3 * q, m, -2 * q)
         back.text(nav.pages[prev.tag].title).xy(x + 5 * q, m).anchor(-1, 0)
         back.rectX(b[0]).order(0)
       }
       if (right) {
-        var rbtn = this.rbtn = elem.button(function () { right.action() }).addClass('right')
+        var rbtn = this.rbtn = elem.trigger(function () { right.action() }).addClass('right')
         rbtn.text(right.label).xy(dims.right - 3 * q, m).anchor(1, 0)
         rbtn.rectX(b[2]).order(0)
       }

@@ -1,5 +1,7 @@
 // create non-hostile environment within node
 
+console.debug = console.log;
+
 window = {}
 window.document = document = {
   createElementNS: function () {}

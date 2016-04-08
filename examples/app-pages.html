@@ -43,7 +43,7 @@
         font-weight: 500;
       }
 
-      .navbar .button {
+      .navbar .trigger {
         cursor: pointer;
         fill: blue;
       }
@@ -126,7 +126,7 @@
           elem.rectX(dims).style({fill: Sky.RGB.random()})
           dims.grid(function (a, b, i, j, n) {
             var what = keys[n]
-            var btn = a.button(function () { win.do('open', 'who', data.update({what: what})) })
+            var btn = a.trigger(function () { win.do('open', 'who', data.update({what: what})) })
             Activity(btn, {dims: b, what: what})
             return a;
           }, elem.g(), {rows: 3, cols: 2})
@@ -150,12 +150,12 @@
           elem.rectX(dims).style({fill: '#fff'})
           elem.textX(dims, data.get('what'))
 
-          data.update({who: 'Just me'}) // XXX
+          data.update({who: 'Just me'})
 
-          var next = elem.button(function () {
+          var next = elem.trigger(function () {
             // wait for make_request
             win.do('step', 'when', data)
-          }).style({fill: 'blue'})
+          })
           next.textX(dims.shift(0, 30), 'Next')
         }
 
@@ -169,9 +169,9 @@
           elem.rectX(dims).style({fill: '#fff'})
           elem.textX(dims, data.get('who'))
 
-          data.update({when: new Date}) // XXX
+          data.update({when: new Date})
 
-          var next = elem.button(win.action('step', 'where', data)).style({fill: 'blue'})
+          var next = elem.trigger(win.action('step', 'where', data))
           next.textX(dims.shift(0, 30), 'Next')
         }
 
@@ -185,9 +185,9 @@
           elem.rectX(dims).style({fill: '#fff'})
           elem.textX(dims, data.get('when'))
 
-          data.update({where: 'Palo Alto'}) // XXX
+          data.update({where: 'Palo Alto'})
 
-          var next = elem.button(win.action('step', 'review', data)).style({fill: 'blue'})
+          var next = elem.trigger(win.action('step', 'review', data))
           next.textX(dims.shift(0, 30), 'Next')
         }
 
@@ -201,10 +201,9 @@
           elem.rectX(dims).style({fill: '#fff'})
           elem.textX(dims, data.get('where'))
 
-          var next = elem.button(function () {
-            // wait for make_proposal
+          var next = elem.trigger(function () {
             win.do('shut', data)
-          }).style({fill: 'blue'})
+          })
           next.textX(dims.shift(0, 30), 'Skej')
         }
 

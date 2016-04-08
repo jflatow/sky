@@ -1,7 +1,7 @@
 var Sky = require('..')
 var Sun = require('../sun')
 var Orb = require('../ext/orb')
-var U = Sky.util, up = Sun.up, Cage = Sun.Cage;
+var U = Sky.util, def = Sun.def, up = Sun.up, Cage = Sun.Cage;
 
 var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
   Cage.call(this)
@@ -120,7 +120,7 @@ var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
     return this.push(state, {transition: 'next'})
   },
   back: function (state, data) {
-    var state = up(state.prev, {data: Sun.def(data, state.data)})
+    var state = up(state.prev, {data: def(data, state.data)})
     return this.push(state, {transition: 'prev'})
   },
 
@@ -129,15 +129,22 @@ var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
     return this.push(state, {transition: 'new'})
   },
   shut: function (state, data) {
-    var state = up(state.parent, {data: Sun.def(data, state.data)})
+    var state = up(state.parent, {data: def(data, state.data)})
     return this.push(state, {transition: 'old'})
+  }
+})
+
+var Theme = Sun.cls(function Theme() {}, {
+  lookup: function (path, d) {
+    return def(Sun.lookup(this, path), d)
   }
 })
 
 var Frame = Sun.cls(function Frame(pkg, elem, opts) {
   Cage.call(this)
   this.elem = elem || Sky.$(document.body)
-  this.style = this.initStyle(pkg)
+  this.defs = this.makeSVGDefs(pkg)
+  this.style = this.loadStyle(pkg)
   this.window = pkg.window;
   this.windows = []
   this.on('top', function (n, o) {
@@ -147,6 +154,7 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
     }
   })
   this.setOpts(opts)
+  this.init(pkg)
 }, Cage.prototype, Orb.prototype, {
   setOpts: function (o) {
     var self = this;
@@ -155,30 +163,36 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
     this.line = this.opts.line || this.dims.copy({h: 20})
     this.windows.map(function (win) { self.nav.redraw(win) })
   },
-  initStyle: function (pkg) {
+  init: function (pkg) { /* override me */ },
+  loadStyle: function (pkg) {
     var frame = this;
+    var addRules = function (s, css) {
+      if (css instanceof Function)
+        s.addRules(css(pkg.theme, frame, pkg))
+      else if (css)
+        s.addRules(css)
+      return s;
+    }
     return [pkg.Frame, pkg.Window, Sky.Elem, Sky.SVGElem].reduce(function (s, c) {
       return Sun.fold(function (s, i) {
         var pro = i[1] && i[1].prototype;
-        var css = pro && pro.__css__;
-        if (css instanceof Function)
-          s.addRules(css(pkg, frame))
-        else if (css)
-          s.addRules(css)
-        return s;
-      }, s, c.prototype)
+        return addRules(s, pro && pro.__css__)
+      }, addRules(s, c.prototype.__css__), c.prototype)
     }, this.makeStyle())
   },
   makeStyle: function () {
     var head = this.elem.doc().$('head')
     return head.child('style').before(head.$('style'))
   },
+  makeSVGDefs: function () {
+    return this.elem.doc().$('head').svg().child('defs')
+  },
   addWindow: function (win) {
     this.windows.push(win)
   },
   removeWindow: function (win) {
     Sun.list.drop(this.windows, win)
-  },
+  }
 })
 
 var Window = Sun.cls(function Window(frame, state, opts) {
@@ -218,6 +232,7 @@ var Window = Sun.cls(function Window(frame, state, opts) {
     this.jack.setOpts({kx: this.opts.kx})
   },
   doBecomeActive: function () {
+    this.activate()
     this.frame.change('top', this)
   },
   didBecomeActive: function () { this.change('activated', true) },
@@ -246,6 +261,7 @@ var Window = Sun.cls(function Window(frame, state, opts) {
 
 var Basic = {
   Nav: Nav,
+  Theme: Theme,
   Frame: Frame,
   Window: Window,
   derive: function (ext) {
@@ -254,6 +270,7 @@ var Basic = {
       nav: function (pages, frame, opts) {
         return new pkg.Nav(pkg, pages, frame, opts)
       },
+      theme: new pkg.Theme,
       frame: Orb.type(pkg.Frame),
       window: Orb.type(pkg.Window)
     })
