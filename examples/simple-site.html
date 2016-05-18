@@ -71,7 +71,7 @@
              return this.main().unique('section.' + key, function (p) {
                var section = p.child('section', {class: key})
                section.div()
-               section.child('input')
+               section.input()
                return section;
              })
            },

@@ -13,21 +13,27 @@ var pointerdown = touch ? 'touchstart' : 'mousedown';
 var pointermove = touch ? 'touchmove' : 'mousemove';
 var pointerup = touch ? 'touchend touchcancel' : 'mouseup';
 
-var Orb = Sun.cls(function Orb(obj, jack, elem) {
-  this.jack = jack || this.jack;
-  this.elem = elem || this.elem;
-  this.grip = 0;
-  up(this, obj)
-}, {
+var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
+  bind: Sky.Elem.prototype.bind,
+  does: function (k, f, a) { return Orb.do(this[k], f, a), this },
   prop: function (f, a) { return Orb.do(this.jack, f, a) },
-  grab: function () { this.grip++; return this.prop('grab', arguments) },
-  free: function () { this.grip--; return this.prop('free', arguments) },
+  grab: function () { this.grip = (this.grip || 0) + 1; return this.prop('grab', arguments) },
+  free: function () { this.grip = (this.grip || 0) - 1; return this.prop('free', arguments) },
   move: function () { return this.prop('move', arguments) },
   push: function () { return this.prop('move', arguments) },
   sync: function () { return this.prop('sync', arguments) },
   drag: function (f, a) { return Orb.drag(this, f, a) },
-  walk: function (f, a) { return Orb.walk(this, f, a) },
   thru: function (o, a) { return Orb.thru(this, o, a) },
+  walk: function (k, f, a) {
+    for (var o = this; o[k]; o = o[k]);
+    return f ? Orb.do(o, f, a) : o;
+  },
+  find: function (f, a) {
+    var kids = this.kids || []
+    for (var i = 0, v; i < kids.length; i++)
+      if ((v = Orb.do(kids[i], f, a)))
+        return v;
+  },
   load: function (json) {
     var path = this.path || []
     var part = Sun.lookup(json || {}, path)
@@ -46,26 +52,36 @@ var Orb = Sun.cls(function Orb(obj, jack, elem) {
       part = this.elem.dump(part)
     return Sun.modify(json, path, part)
   },
-  hide: function (b) { this.elem && this.elem.hide(b); return this; },
-  show: function (b) { this.elem && this.elem.show(b); return this; },
-  activate: function (b) { return this.elem && this.elem.activate(b) },
-  collapse: function (b) { return this.elem && this.elem.collapse(b) },
+  hide: function () { return this.does('elem', 'hide', arguments) },
+  show: function () { return this.does('elem', 'show', arguments) },
+  order: function () { return this.does('elem', 'order', arguments) },
+  remove: function (b) { return this.does('elem', 'remove', arguments) },
+  activate: function (b, r) {
+    if (dfn(r, false))
+      this.does('kids', 'activate', arguments)
+    return this.does('elem', 'activate', arguments)
+  },
+  collapse: function (b, r) {
+    if (dfn(r, true))
+      this.does('kids', 'collapse', arguments)
+    return this.does('elem', 'collapse', arguments)
+  },
   validate: function (b) {
     if (this.kids)
       return this.kids.reduce(function (a, k) { return k.validate(a) }, dfn(b, true))
     return this.elem && this.elem.validate(b)
   }
 })
+
 Orb = module.exports = up(Orb, {
-  do: function (o, f, a) {
+  do: function (o, f, a, s) {
     if (o) {
       if (o[f])
         return o[f].apply(o, a)
       if (o instanceof Array)
-        return o.reduce(function (_, i) { return Orb.do(i, f, a) }, 0)
+        return o.reduce(function (s, i) { return Orb.do(i, f, a) || s }, s)
     }
   },
-  call: function (o, f) { return Orb.do(o, f, [].slice.call(arguments, 2)) },
   grab: function (o) { return Orb.do(o, 'grab', [].slice.call(arguments, 1)) },
   free: function (o) { return Orb.do(o, 'free', [].slice.call(arguments, 1)) },
   move: function (o, dx, dy, a, r, g, s) {
@@ -74,18 +90,22 @@ Orb = module.exports = up(Orb, {
   drag: function (o, f, a) {
     return Orb.grab(o), Orb.do(o, f, a), Orb.free(o), o;
   },
-  type: function (cons) {
-    var cons = Sun.cls.extend.apply(cons, cat(new Orb, [].slice.call(arguments, 1)))
-    var func = function (a, r, g, s) { return new cons(this, a, r, g, s) }
-    return up(func, {prototype: cons.prototype})
-  },
-  walk: function (o, f, a) {
-    return f.call(o, o.parent ? Orb.walk(o.parent, f, a) : a)
-  },
   thru: function (o, p, a) {
-    return a.map(function (k) {
-      Object.defineProperty(o, k, {get: function () { return p[k] }})
-    })
+    if (a instanceof Array)
+      return a.map(function (k) {
+        Object.defineProperty(o, k, {get: function () { return p[k] }})
+      })
+    return Sun.fold(function (o, i) {
+      var k = i[0], f = i[1]
+      Object.defineProperty(o, k, {
+        configurable: true,
+        get: function () { return this[f] && this[f][k] },
+        set: function (v) {
+          Object.defineProperty(this, k, {value: v, configurable: true, writable: true})
+        }
+      })
+      return o;
+    }, o, p)
   }
 })
 
@@ -121,14 +141,21 @@ Sky.Elem.prototype.update({
   dbltap: function (fun, opts) {
     var opts = up({gap: 250}, opts)
     var self = this, taps = 0;
-    this.on(pointerdown, function (e) {
+    return this.on(pointerdown, function (e) {
       if (taps++)
         fun && fun.apply(self, arguments)
       setTimeout(function () { taps = 0 }, opts.gap)
       if (opts.prevent)
         e.preventDefault()
     })
-    return this;
+  },
+
+  tapout: function (fun, opts) {
+    var self = this, dead;
+    return this.doc().til(pointerup, function (e) {
+      if (!self.node.contains(e.target))
+        dead = fun && fun.apply(self, arguments) || true;
+    }, function () { return dead }, true)
   },
 
   press: function (o, opts) {
@@ -193,7 +220,7 @@ Sky.Elem.prototype.update({
   },
 
   orb: function (obj, jack) {
-    return new Orb(obj, jack, this)
+    return new Orb(up({elem: this, jack: jack}, obj))
   },
 
   amp: Orb.type(function Amp(elem, jack, opts) {

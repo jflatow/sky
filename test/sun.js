@@ -40,6 +40,16 @@ test('equals', function (t) {
   t.end()
 })
 
+test('match', function (t) {
+  t.ok(Sun.match(undefined, undefined))
+  t.ok(Sun.match(undefined, null))
+  t.ok(Sun.match(0, 0))
+  t.ok(Sun.match({'a': 'b'}, {'a': 'b'}))
+  t.ok(Sun.match({}, function (v) { return v != undefined }))
+  t.ok(Sun.match(null, function (v) { return v == undefined }))
+  t.end()
+})
+
 test('key', function (t) {
   t.deepEqual(Sun.key([1, true]), 1)
   t.deepEqual(Sun.key([{k: 2}, true]), {k: 2})
@@ -133,6 +143,32 @@ test('remove', function (t) {
   t.deepEqual(Sun.remove([['x', [['y', {'z': true}]]]], ['x', 'y', 'z']), [['x', [['y', {}]]]])
   t.deepEqual(Sun.remove({x: ['y']}, ['x']), {})
   t.deepEqual(Sun.remove({x: ['y']}, ['x', 'y']), {x: []})
+  t.end()
+})
+
+test('accrue', function (t) {
+  t.deepEqual(Sun.accrue(Sun.accrue({}, ['x'], ['+', 5]), ['x'], ['-', 1]), {x: 4})
+  t.deepEqual(Sun.accrue({x: []}, ['x'], ['+', ['abc', 'def']]), {x: ['abc', 'def']})
+  t.deepEqual(Sun.accrue({x: ['def']}, ['x'], ['+', ['abc', 'def']]), {x: ['def', 'abc']})
+  t.deepEqual(Sun.accrue({x: ['def']}, ['x'], ['-', ['abc', 'def']]), {x: []})
+  t.deepEqual(Sun.accrue({x: ['def', 'ghi']}, ['x'], ['-', ['def']]), {x: ['ghi']})
+  t.deepEqual(Sun.accrue({x: {y: {z: 1}}}, ['x', 'y'], ['+', {z: 2}]), {x: {y: {z: 2}}})
+  t.deepEqual(Sun.accrue({x: {y: {z: 1}}}, ['x', 'y'], ['-', {z: 2}]), {x: {y: {}}})
+  t.deepEqual(Sun.accrue({x: {y: {z: 1}}}, ['x', 'y'], ['=', 'abc']), {x: {y: 'abc'}})
+  t.end()
+})
+
+test('create', function (t) {
+  t.deepEqual(Sun.create({}, ['x'], 1), {x: 1})
+  t.deepEqual(Sun.create({x: 2}, ['x'], 1), {x: 2})
+  t.end()
+})
+
+test('swap', function (t) {
+  t.deepEqual(Sun.swap({}, ['x'], true), {})
+  t.deepEqual(Sun.swap({x: false}, ['x'], true), {x: true})
+  t.deepEqual(Sun.swap({x: false}, ['x'], true, -1), {x: false})
+  t.deepEqual(Sun.swap({x: -1}, ['x'], true, -1), {x: true})
   t.end()
 })
 

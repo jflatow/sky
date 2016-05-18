@@ -3,13 +3,13 @@ var Sun = require('../sun')
 var Orb = require('../ext/orb')
 var U = Sky.util, def = Sun.def, up = Sun.up, Cage = Sun.Cage;
 
-var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
+var Nav = Cage.subcls(function Nav(pkg, pages, frame, opts) {
   Cage.call(this)
   this.pages = pages instanceof Function ? pages(this) : pages;
   this.frame = frame || pkg.frame()
   this.frame.nav = this;
   this.setOpts(opts)
-}, Cage.prototype, {
+}, {
   setOpts: function (o) {
     var self = this;
     var opts = this.opts = up(this.opts || {manageHistory: false}, o)
@@ -135,12 +135,24 @@ var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
 })
 
 var Theme = Sun.cls(function Theme() {}, {
+  units: Sky.units,
+  border: function (color, width, style) {
+    return this.units.map(['size', 'brStyle', 'color'],
+                          [width || 1, style || 'solid', this.color(color)]).join(' ')
+  },
+  shadow: function (color, dx, dy, b, s) {
+    return this.units.map(['size', 'size', 'size', 'size', 'color'],
+                          [dx || 0, dy || 0, b || 0, s || 0, this.color(color)]).join(' ')
+  },
+  color: function (name) {
+    return this.lookup(['colors', name])
+  },
   lookup: function (path, d) {
     return def(Sun.lookup(this, path), d)
   }
 })
 
-var Frame = Sun.cls(function Frame(pkg, elem, opts) {
+var Frame = Cage.subcls(function Frame(pkg, elem, opts) {
   Cage.call(this)
   this.elem = elem || Sky.$(document.body)
   this.defs = this.makeSVGDefs(pkg)
@@ -155,7 +167,7 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
   })
   this.setOpts(opts)
   this.init(pkg)
-}, Cage.prototype, Orb.prototype, {
+}, {
   setOpts: function (o) {
     var self = this;
     this.opts = up(this.opts || {kx: 0}, o)
@@ -195,7 +207,7 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
   }
 })
 
-var Window = Sun.cls(function Window(frame, state, opts) {
+var Window = Cage.subcls(function Window(frame, state, opts) {
   var self = this;
   var elem = this.elem = this.elem || frame.elem;
   var opts = up({detach: this.elem !== frame.elem}, opts)
@@ -226,7 +238,7 @@ var Window = Sun.cls(function Window(frame, state, opts) {
   })
   this.setOpts(opts)
   this.frame.addWindow(self)
-}, Cage.prototype, Orb.prototype, {
+}, {
   setOpts: function (o) {
     this.opts = up(this.opts || {kx: this.frame.opts.kx}, o)
     this.jack.setOpts({kx: this.opts.kx})

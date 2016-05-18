@@ -7,7 +7,7 @@ var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
 var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
 var pre = function (a, k, d) { return a[k] = get(a, k, d) }
 var map = function (a, f) { return [].concat(a || []).map(f) }
-var each = function (a, f) { return a && a.map ? a.map(f) : f(a) }
+var each = function (a, f) { return a && a.map ? a.map(f) : f(a, 0) }
 var wrap = function (node) {
   if (node)
     switch (node.namespaceURI) {
@@ -156,7 +156,7 @@ var Q = up(units, {
     rotate: 'deg',
     skewX: 'deg',
     skewY: 'deg',
-    borderRadius: 'px',
+    borderRadius: 'px'
   },
   unify: function (k, v, u) {
     var u = u || Q.defaults, d = u[k] || '';
@@ -170,6 +170,9 @@ var Q = up(units, {
   },
   each: function (ks, o, u) {
     return each(ks, function (k) { return Q.unify(k, o[k], u) })
+  },
+  map: function (ks, vs, u) {
+    return each(ks, function (k, i) { return Q.unify(k, vs[i], u) })
   },
   rect: function (b, u) {
     return 'rect(' + Q.each(['top', 'right', 'bottom', 'left'], b, u) + ')'
@@ -369,9 +372,9 @@ Elem.prototype.update({
     p.insertBefore(n, p.childNodes[util.clip(k < 0 ? C + k : k, 0, C)])
     return this;
   },
-  remove: function () {
+  remove: function (b) {
     var n = this.node, p = n.parentNode;
-    if (p)
+    if (p && dfn(b, true))
       p.removeChild(n)
     return this;
   },
@@ -413,7 +416,7 @@ Elem.prototype.update({
     return this.$(q) || fun(this)
   },
 
-  hide: function (b) { return this.attrs({hidden: dfn(b, false) ? '' : null}) },
+  hide: function (b) { return this.attrs({hidden: dfn(b, true) ? '' : null}) },
   show: function (b) { return this.attrs({hidden: dfn(b, true) ? null : ''}) },
   activate: function (b) { return this.instate(b, 'activated') },
   collapse: function (b) { return this.instate(b, 'collapsed') },
@@ -421,14 +424,14 @@ Elem.prototype.update({
     var n = this.node, v;
     if (n.checkValidity) {
       if (v = !n.checkValidity())
-        b = v;
+        b = false;
       this.instate(v, 'invalidated')
     }
     return this.fold(function (a, c) { return Sky.elem(c).validate(a) }, dfn(b, true))
   },
   instate: function (b, c, d) {
     var b = dfn(b, true)
-    return this.toggleClass(c, b).fire(c, up({value: b}, d), {bubbles: true})
+    return this.toggleClass(c, b).fire(c, up({value: b}, d))
   },
 
   attr: function (name, ns) {
@@ -485,14 +488,12 @@ Elem.prototype.update({
   removeClass: function (cls) {
     var node = this.node;
     map(cls, function (c) { node.classList.remove(c) })
-    if (!node.classList.length)
-      node.removeAttribute('class')
     return this;
   },
   toggleClass: function (cls, b) {
-    if (dfn(b, !this.hasClass(cls)))
-      return this.addClass(cls)
-    return this.removeClass(cls)
+    var node = this.node;
+    map(cls, function (c) { node.classList.toggle(c, b) })
+    return this;
   },
   css: function (k) {
     var css = getComputedStyle(this.node)
@@ -503,7 +504,7 @@ Elem.prototype.update({
     var rec = function (sel, rule, str) {
       var str = str || ''
       for (var property in rule) {
-        if (sel.match(/^@media/))
+        if (sel.match(/^@/))
           str += property + '{' + rec(property, rule[property]) + '}'
         else
           str += property + ': ' + rule[property] + ';'
@@ -556,21 +557,21 @@ Elem.prototype.update({
     return this;
   },
   upon: function (types, fun, capture) {
-    var f = function (e) { return fun.call(this, e, e.detail) }
-    return this.on(types, f, capture) && f;
+    var f = function (e) { return fun.call(this, e.detail.value, e) }
+    return this.on(types, f, capture)
   },
-  once: function (types, fun) {
+  once: function (types, fun, capture) {
     var n = 0;
-    return this.til(types, fun, function () { return n++ })
+    return this.til(types, fun, function () { return n++ }, capture)
   },
-  til: function (types, fun, dead) {
+  til: function (types, fun, dead, capture) {
     var self = this;
     self.on(types, function () {
       if (dead())
         self.off(types, arguments.callee)
       else
         fun.apply(this, arguments)
-    })
+    }, capture)
   },
 
   hl: function (text, level) {
@@ -597,6 +598,9 @@ Elem.prototype.update({
   },
   g: function (attrs, props) {
     return this.div(attrs, props)
+  },
+  q: function (cls) {
+    return this.unique('.' + cls, function (p) { return p.g({class: cls}) })
   },
   icon: function (href, w, h, u) {
     return this.svg({class: 'icon'}).icon(href).parent().size(w, h, u)
@@ -642,7 +646,7 @@ Elem.prototype.update({
       return this.rect(x, y, w, h, u)
   },
   textX: function (box, text, ax, ay, u) {
-    return this.text(text).align(box || this.bbox(), ax, ay, u)
+    return this.text(text).align(box || this.bbox(), ax, ay, u).anchor(ax, ay)
   },
 
   flex: function (ps, hzn, u) {
@@ -664,8 +668,9 @@ Elem.prototype.update({
     return this.g({class: 'col'}).flex(ps, false, u)
   },
 
-  bbox: function () {
-    return (new Box(this.node.getBoundingClientRect())).shift(pageXOffset, pageYOffset)
+  bbox: function (fixed) {
+    var box = new Box(this.node.getBoundingClientRect())
+    return fixed ? box : box.shift(pageXOffset, pageYOffset)
   },
 
   wh: function (w, h, u) {
@@ -690,7 +695,7 @@ Elem.prototype.update({
 
   align: function (box, ax, ay, u) {
     with (Sky.box().align(box, ax, ay))
-      return this.place(x, y, u).anchor(ax, ay)
+      return this.place(x, y, u)
   },
   embox: function (box, u) {
     with (box)
@@ -698,12 +703,12 @@ Elem.prototype.update({
   },
 
   anchor: function (i, j) {
-    var a = i < 0 ? 0 : (i > 0 ? -100 : -50)
-    var b = j < 0 ? 0 : (j > 0 ? -100 : -50)
+    var a = -((i || 0) + 1) * 50;
+    var b = -((j || 0) + 1) * 50;
     return this.transform({translate: [a + '%', b + '%']})
   },
   hang: function (ax, ay, u) {
-    return this.align(Sky.box(0, 0, 100, 100), ax, ay, up({top: '%', left: '%'}, u))
+    return this.align(Sky.box(0, 0, 100, 100), ax, ay, up({top: '%', left: '%'}, u)).anchor(ax, ay)
   },
 
   screen: function (x, y) {
@@ -724,7 +729,7 @@ Elem.prototype.update({
     return this.style({transform: xform})
   },
   transformation: function (val, u) {
-    var s = this.node.style, val = val || s['transform'] || '';
+    var val = val || this.node.style.transform || '';
     var m, p = /(\w+)\(([^\)]*)\)/g, tx = {}
     while (m = p.exec(val)) {
       var k = m[1], v = m[2].split(',')
@@ -743,9 +748,12 @@ Elem.prototype.update({
           if ([].some.call([].concat(json), function (v) { return v == o.value }))
             o.selected = true;
         })
-          else if (t == 'checkbox')
-            n.checked = [].some.call([].concat(json), function (v) { return v == n.value })
-      else if (t == 'radio')
+      else if (t == 'fieldset')
+        this.each('input', function (i) {
+          if ([].some.call([].concat(json), function (v) { return v == i.value }))
+            i.checked = true;
+        })
+      else if (t == 'checkbox' || t == 'radio')
         n.checked = json == n.value;
       else if (n.value !== undefined)
         n.value = json || ''
@@ -759,7 +767,7 @@ Elem.prototype.update({
 
   dump: function (json) {
     var json = json || {}
-    var n = this.node, t = n.type, p = n.name && json[n.name]
+    var n = this.node, t = n.type, p;
     if (t == 'button' || t == 'reset' || t == 'submit')
       return json;
     else if (t == 'select-one')
@@ -769,11 +777,17 @@ Elem.prototype.update({
     else if (t == 'select-multiple')
       p = this.each('option', function (o, l) {
         return (o.selected && l.push(o.value)), l;
-      }, []);
-    else if (t == 'checkbox')
-      p = n.checked ? (p || []).concat(n.value) : (p || [])
-    else if (t == 'radio')
-      p = n.checked ? n.value : p;
+      }, [])
+    else if (t == 'fieldset' && n.querySelector('[type="radio"]'))
+      p = this.each('input', function (i, v) {
+        return (i.checked) ? i.value : v;
+      }, null)
+    else if (t == 'fieldset')
+      p = this.each('input', function (i, l) {
+        return (i.checked && l.push(i.value)), l;
+      }, [])
+    else if (t == 'checkbox' || t == 'radio')
+      p = n.checked;
     else if (t == 'number' || t == 'range')
       p = dfn(n.valueAsNumber, null)
     else
@@ -785,6 +799,63 @@ Elem.prototype.update({
         return Sky.elem(c).dump(o)
       }, n.name ? pre(json, n.name, {}) : json)
     return json;
+  },
+
+  form: function (attrs, props) {
+    return this.child('form', attrs, props)
+  },
+  label: function (text) {
+    return this.child('label').txt(text)
+  },
+  button: function (desc, props) {
+    var desc = up({}, desc)
+    var icon = pop(desc, 'icon')
+    var label = pop(desc, 'label', '')
+    var action = pop(desc, 'action', function () {})
+    var elem = this.child('button', desc, props)
+    if (icon)
+      elem.icon.apply(elem, [].concat(icon))
+    else if (label)
+      elem.txt(label)
+    return elem.on('click', action.bind(elem))
+  },
+  input: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var elem = label ? this.label(label) : this;
+    return elem.child('input', desc, props)
+  },
+  fieldset: function (desc) {
+    var desc = up({}, desc)
+    var options = pop(desc, 'options', [])
+    return options.reduce(function (s, d) {
+      var d = [].concat(d)
+      return s.input(up(desc, {value: d[0], label: d[1] || d[0]})), s;
+    }, this.child('fieldset', {name: desc.name}))
+  },
+  option: function (value, text) {
+    return this.child('option', {value: value}).txt(text || value)
+  },
+  options: function (desc) {
+    if (desc instanceof Array)
+      this.map(desc, 'option')
+    else if (desc instanceof Object)
+      for (var k in desc)
+        this.child('optgroup', {label: k}).map(desc[k], 'option')
+    return this;
+  },
+  select: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var options = pop(desc, 'options')
+    var elem = label ? this.label(label) : this;
+    return elem.child('select', desc, props).options(options)
+  },
+  textarea: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var elem = label ? this.label(label) : this;
+    return elem.child('textarea', desc, props)
   }
 })
 

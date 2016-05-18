@@ -72,6 +72,10 @@ var equals = function (a, b) {
   return false;
 }
 
+var match = function (a, b) {
+  return (b instanceof Function) ? b(a) : equals(a, b)
+}
+
 var key = function (i, k) {
   if (k instanceof Function)
     return k(i)
@@ -114,11 +118,9 @@ var first = function (o, f) {
 
 var fold = function (f, a, o) {
   if (o instanceof Array)
-    for (var i = 0; i < o.length; i++)
-      a = f(a, o[i], i, o)
-  else
-    for (var ks = Object.keys(def(o, {})), i = 0, k = ks[i]; i < ks.length; k = ks[++i])
-      a = f(a, [k, o[k]], k, o)
+    return o.reduce(f, a)
+  for (var ks = Object.keys(def(o, {})), i = 0, k = ks[i]; i < ks.length; k = ks[++i])
+    a = f(a, [k, o[k]], k, o)
   return a;
 }
 
@@ -183,6 +185,7 @@ var Sun = module.exports = {
   nchoosek: nchoosek,
   bezier: bezier,
   equals: equals,
+  match: match,
   key: key,
   val: val,
   keyEquate: keyEquate,
@@ -245,12 +248,34 @@ var Sun = module.exports = {
     return nil(obj)
   },
 
+  accrue: function (obj, path, change, op) {
+    var op = def(op, Sun.op)
+    return Sun.modify(obj, path, function (v) { return op(v, change) })
+  },
+
+  create: function (obj, path, initial) {
+    return Sun.swap(obj, path, initial, function (v) { return v === undefined })
+  },
+
+  swap: function (obj, path, swap, cmp) {
+    var val = Sun.lookup(obj, path)
+    if (match(val, def(cmp, function (v) { return v !== undefined })))
+      return Sun.modify(obj, path, swap)
+    return obj;
+  },
+
   object: function (iter) {
     return fold(function (a, i) { return (a[i[0]] = i[1]), a }, {}, iter)
   },
 
-  update: function (a, b) {
-    return fold(function (a, i) { return set(a, key(i), val(i)) }, a, b)
+  insert: function (obj, item) {
+    if (!(obj instanceof Array) || (item instanceof Array))
+      return set(obj, key(item), val(item))
+    return L.insert(obj, item)
+  },
+
+  update: function (obj, iter) {
+    return fold(Sun.insert, obj, iter)
   },
 
   except: function (obj, iter) {
@@ -260,7 +285,7 @@ var Sun = module.exports = {
   filter: function (obj, fun) {
     return fold(function (a, i) {
       if (fun(i))
-        set(a, key(i), val(i))
+        Sun.insert(a, i)
       return a;
     }, nil(obj), obj)
   },
@@ -291,35 +316,56 @@ var Sun = module.exports = {
   }
 }
 
-// derive: copy the constructor with an extended prototype
-// extend: change the constructor prototype in-place
-// subcls: change the constructor function and use an extended prototype
-
-var derive = function (cons, args) {
-  var copy = function () { return cons.apply(this, arguments) }
-  return extend(cls(copy), cat(cons.prototype, args))
-}
-var extend = function (cons, args) {
-  return [].reduce.call(args, up, cons.prototype), cons;
-}
-
-var cls = Sun.cls = up(function (cons) {
-  return up(extend(cons, [].slice.call(arguments, 1)), cls)
+var O = Sun.op = up(function (value, change) {
+  return O[change[0]](value, change[1])
 }, {
-  derive: function () { return derive(this, [].slice.call(arguments)) },
-  extend: function () { return extend(this, [].slice.call(arguments)) },
-  subcls: function (cons) {
-    return extend(cons, cat(this.prototype, [].slice.call(arguments, 1)))
+  '+': function (v, d) {
+    var v = def(v, nil(d))
+    return (d instanceof Object) ? Sun.update(v, d) : v + d;
+  },
+  '-': function (v, d) {
+    var v = def(v, nil(d))
+    return (d instanceof Object) ? Sun.except(v, d) : v - d;
+  },
+  '=': function (v, d) {
+    return d;
   }
 })
 
-Sun.Cage = function Cage(obj, opt) {
+// derive: copy the constructor with an extended prototype
+// extend: change the constructor prototype in-place
+// subcls: rebase the constructor prototype on another
+// type: create a subcls with a functional constructor
+
+var derive = function (cons, over) {
+  var copy = function () { return cons.apply(this, arguments) }
+  return extend(cls(up(copy, {prototype: ext(cons.prototype)})), over)
+}
+var extend = function (cons, over) {
+  return cat([], over).reduce(up, cons.prototype), cons;
+}
+
+var cls = Sun.cls = up(function (cons, over) {
+  return up(extend(cons, over), cls)
+}, {
+  derive: function (over) { return derive(this, over) },
+  extend: function (over) { return extend(this, over) },
+  subcls: function (cons, over) {
+    return up(up(cons, {prototype: up(ext(this.prototype, cons.prototype), over)}), this)
+  },
+  type: function (cons, over) {
+    var sub = this.subcls(cons, over)
+    var fun = function (a, r, g, s) { return new sub(this, a, r, g, s) }
+    return up(fun, {prototype: sub.prototype})
+  }
+})
+
+Sun.Cage = cls(function Cage(obj, opt) {
   this.__opt__ = up({sep: /\s+/}, opt)
   this.__obj__ = obj || this;
   this.__fns__ = {}
   return this;
-}
-up(Sun.Cage.prototype, {
+}, {
   fire: function (k, v, o) {
     var self = this, funs = self.__fns__[k] || []
     funs.map(function (f) { f.call(self, v, o, k) })
@@ -427,7 +473,7 @@ var L = Sun.list = up(function (x) {
   return x instanceof Array ? x : [x]
 }, {
   last: function (list, n) { return list[list.length - (n || 1)] },
-  append: function (list, item) { return list.push(item) && list },
+  append: function (list, item) { return list.push(item), list },
   concat: function (item, list) { return [item].concat([].slice.call(list)) },
   drop: function (list, item) {
     var i = list.indexOf(item)
@@ -452,12 +498,12 @@ var L = Sun.list = up(function (x) {
       list.push(item)
     return list;
   },
-  insert: function (list, item, lte) {
-    var lte = lte || Sun.lte;
+  insert: function (list, item, eq) {
+    var eq = eq || Sun.equals;
     for (var i = 0; i < list.length; i++)
-      if (lte(item, list[i]))
-        return list.splice(i, 0, item) && list;
-    return list.push(item) && list;
+      if (eq(item, list[i]))
+        return list;
+    return L.append(list, item)
   },
   umerge: function (x, y, lt) {
     var lt = lt || Sun.lt;
