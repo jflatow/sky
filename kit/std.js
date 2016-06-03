@@ -3,8 +3,8 @@ var Sun = require('../sun')
 var Orb = require('../ext/orb')
 var UFO = require('../kit/ufo')
 
-var U = Sky.util, P = Sky.path, dfn =U.dfn, map = U.map, pop = U.pop, pre = U.pre;
-var L = Sun.list, up = Sun.up, cat = Sun.cat, get = Sun.get;
+var U = Sky.util, P = Sky.path, dfn = U.dfn, pop = U.pop, pre = U.pre;
+var L = Sun.list, up = Sun.up, cat = Sun.cat, get = Sun.get, map = Sun.map;
 
 var optify = function (opts, key, over) {
   return up((opts instanceof Object) ? opts : Sun.object([[key, opts]]), over)
@@ -21,8 +21,6 @@ var Widget = Orb.derive({
       this.elem.attrs({class: c || ''}).addClass(opts.classes)
     if (o.style)
       this.elem.style(opts.style)
-    if (o.mutex)
-      this.mutex = opts.mutex;
     if (o.upon)
       Sun.fold(function (e, i, w) { return e.upon(i[0], i[1]) }, this.elem, o.upon)
     return opts;
@@ -38,7 +36,7 @@ var Widget = Orb.derive({
   },
   removeKids: function () {
     // NB: remove mutates list: must use copy-map
-    return map(this.kids, this.removeKid.bind(this))
+    return map(this.kids.slice(), this.removeKid.bind(this))
   },
   selectKid: function (kid) {
     map(this.kids, function (k) {
@@ -47,16 +45,80 @@ var Widget = Orb.derive({
     })
   },
 
-  // body delegation methods
+  // delegation methods for managing other widgets
+  // item(s) refers to member(s) of the collection
   // NB: could index paths here for faster access
-  createItem: function () {
-    return this.walk('body', 'createKid', arguments)
+  createItem: function (desc) {
+    return this.walk('body', 'createKid', [desc])
   },
   removeItem: function (item) {
-    return this.walk('body', 'removeKid', arguments)
+    return this.walk('body', 'removeKid', [item])
   },
   selectItem: function (item) {
-    return this.walk('body', 'selectKid', arguments)
+    return this.walk('body', 'selectKid', [item])
+  },
+
+  removeItems: function (items) {
+    return map(items || this.getItems(), this.bind('removeItem'))
+  },
+
+  // collection either has keys or not, default is based on item template
+  collectionKey: function (datum) {
+    if (dfn(this.keys, this.item instanceof Function))
+      return Sun.key(datum)
+  },
+
+  getItems: function () {
+    return this.walk('body').kids.slice()
+  },
+  findItem: function (key) {
+    var path = [key]
+    if (key != null)
+      return Sun.first(this.getItems(), function (i) { return Sun.equals(i.path, path) })
+  },
+
+  // obtain & remove items from data (infers descriptors)
+  // if widget is a collection, it manages its items using data
+  obtainItemFor: function (datum) {
+    var datum = this.peel(datum), key = this.collectionKey(datum)
+    var item = this.findItem(key) || this.createItem(this.call('item', key, datum))
+    if (key)
+      item.path = [key]
+    return item.load(key == null ? datum : [datum])
+  },
+  removeItemFor: function (datum) {
+    var datum = this.peel(datum), key = this.collectionKey(datum)
+    var item = this.findItem(key)
+    return item && this.removeItem(item)
+  },
+
+  obtainItemsFor: function (data) {
+    return map(data, this.bind('obtainItemFor'))
+  },
+  removeItemsFor: function (data) {
+    return map(data, this.bind('removeItemFor'))
+  },
+
+  peel: function (json) { var f = this.opts.peel; return f ? f.call(this, json) : json },
+  wrap: function (json) { var f = this.opts.wrap; return f ? f.call(this, json) : json },
+  load: function (json) {
+    if (this.item) {
+      this.removeItems()
+      this.obtainItemsFor(Sun.lookup(json || {}, this.path || []))
+      return this;
+    }
+    return Orb.prototype.load.apply(this, arguments)
+  },
+
+  dump: function (json) {
+    if (this.item) {
+      var wrap = this.bind('wrap')
+      var data = map(this.getItems(), function (i) {
+        return wrap(i.path ? i.dump([])[0] : i.dump())
+      })
+      return Sun.modify(json, this.path || [], data)
+    }
+    return Orb.prototype.dump.apply(this, arguments)
   },
 
   // path manipulation methods
@@ -81,7 +143,7 @@ var Widget = Orb.derive({
   selectPath: function (path) {
     // NB: parent is not active if child is, but does not collapse
     //     hopefully CSS :has(.activated) will be supported soon...
-    var p = this.path || [], e = this.mutex;
+    var p = this.path || [], e = this.opts.mutex;
     for (var i = 0; i < p.length; i++)
       if (path[i] != p[i])
         return e && this.collapse(true), this.activate(false, true), false;
@@ -104,12 +166,13 @@ Orb.thru(Widget.prototype, {
   elem: 'base',
   kids: 'base',
   opts: 'base',
-  path: 'opts'
+  path: 'opts',
+  item: 'opts'
 })
 
 Sky.Elem.prototype.update({
-  stack: Widget.type(function Stack(root, opts) {
-    this.elem = root.g()
+  stack: Widget.type(function Stack(root, opts, elem) {
+    this.elem = elem || root.g()
     this.kids = []
     this.setOpts(opts || {}, true)
   }, {
@@ -185,6 +248,7 @@ Sky.Elem.prototype.update({
 
   field: Widget.type(function Field(root, opts) {
     this.elem = root.g()
+    this.kids = []
     this.setOpts(opts || {}, true)
   }, {
     __css__: function (theme) {
@@ -246,8 +310,10 @@ Sky.Elem.prototype.update({
       var ctrl = this.elem.q('control')
       desc.q('epithet').txt(opts.epithet || '')
       desc.q('advice').txt(opts.advice || '')
-      if (f || o.control)
-        ctrl.clear().apply(opts.control || ['input'])
+      if (f || o.control) {
+        this.removeKids()
+        this.createKid(opts.control || ['input'], ctrl)
+      }
     },
 
     collapse: function (b, r) {
@@ -312,7 +378,7 @@ Sky.Elem.prototype.update({
 
     setOpts: function (o, f) {
       var opts = this.stdOpts(o, f, 'popup', {dismiss: 'remove'})
-      var ax = dfn(opts.ax, 1), ay = dfn(opts.ay, 0),
+      var ax = dfn(opts.ax, 0), ay = dfn(opts.ay, 0),
           bx = dfn(opts.bx, -ax), by = dfn(opts.by, -ay),
           dx = dfn(opts.dx, 16 * ax), dy = dfn(opts.dy, 16 * ay)
       var abox = (opts.abox || this.elem.parent().bbox(opts.fixed))
@@ -368,38 +434,111 @@ Sky.Elem.prototype.update({
       if (f || o.title)
         this.base.setOpts({
           title: optify(opts.title, 'body', {
-            foot: ['addButton', {action: function () { self.listAdd() }}]
+            foot: ['addButton', {action: function () { self.createItem(self.call('item')) }}]
           })
         })
     },
 
-    load: function (json) {
-      var part = Sun.lookup(json || {}, this.path || [])
-      var items = this.walk('body').kids;
-      map(items, this.listRemove.bind(this))
-      map(part, this.listAdd.bind(this))
-      return this;
-    },
-    dump: function (json) {
-      var items = this.walk('body').kids;
-      return Sun.modify(json, this.path || [], items.map(function (i) { return i.dump() }))
-    },
-
-    listAdd: function (data) {
+    createItem: function (desc) {
       var self = this;
-      var item = this.createItem(['barbell', {
+      var item = Widget.prototype.createItem.call(this, ['barbell', {
         classes: ['list-editor-item'],
-        body: this.opts.item,
-        foot: ['removeButton', {action: function () { self.listRemove(item) }}]
-      }]).load(data)
+        body: desc,
+        foot: ['removeButton', {action: function () { self.removeItem(item) }}]
+      }])
       item.elem.on('click', this.bind('selectItem', item))
       this.selectItem(item)
       this.elem.fire('list-change', {editor: this, item: item, kind: 'add'}, {bubbles: true})
+      return item;
     },
 
-    listRemove: function (item) {
-      this.removeItem(item)
+    removeItem: function (item) {
+      var item = Widget.prototype.removeItem.call(this, item)
       this.elem.fire('list-change', {editor: this, item: item, kind: 'remove'}, {bubbles: true})
+      return item;
+    }
+  }),
+
+  tokenListEditor: Widget.type(function (root, opts) {
+    var self = this;
+    var base = this.base = root.stack({items: [['input']]})
+    var input = this.inp = base.kids.splice(0, 1)[0]
+    input.on('keydown', function (e) {
+      switch (e.which) {
+      case 8: return self.deleteBackward()
+      case 13: return self.confirmEntry()
+      default: return self.activate(false, true)
+      }
+    })
+    this.setOpts(opts || {}, true)
+  }, {
+    __css__: function (theme ) {
+      return {
+        '.token-list-editor': {
+          'display': 'flex',
+          'align-items': 'center',
+          'flex-direction': 'row',
+          'flex-wrap': 'wrap',
+          'border': theme.border('crisp-br'),
+          'padding': '0.5ex',
+          'min-height': '2.5em'
+        },
+        '.token-list-editor output': {
+          'border': theme.border('gentle-br'),
+          'background-color': theme.color('faint-bg'),
+          'margin': '0.25ex',
+          'padding': '0 1ex',
+          'overflow': 'hidden',
+          'text-overflow': 'ellipsis'
+        },
+        '.token-list-editor output.activated': {
+          'border': theme.border('focus-br'),
+        },
+        '.token-list-editor input': {
+          'flex': '1 1',
+          'margin': '1ex 1.5ex',
+          'border': 'none',
+          'outline': 'none',
+          'min-width': '2em !important'
+        }
+      }
+    },
+
+    setOpts: function (o, f) {
+      var self = this;
+      var opts = this.stdOpts(o, f, 'token-list-editor')
+      if (f || o.input)
+        this.inp.attrs(opts.input)
+    },
+
+    keys: false,
+    item: function () {
+      var self = this;
+      return function (elem) {
+        return elem.output().before(self.inp).upon('click', function () {
+          self.selectKid(this)
+          self.inp.node.focus()
+        })
+      }
+    },
+
+    confirmEntry: function () {
+      var text = this.inp.node.value;
+      if (text) {
+        this.obtainItemFor(text)
+        this.inp.node.value = ''
+      }
+    },
+    deleteBackward: function () {
+      var kids = this.kids, active = Sun.first(kids, function (k) {
+        return k.hasClass('activated') && k;
+      })
+      if (active)
+        return this.removeKid(active)
+      if (this.inp.node.value == '') {
+        if (kids.length)
+          return this.selectKid(L.last(kids))
+      }
     }
   }),
 
@@ -427,7 +566,9 @@ var Std = module.exports = UFO.derive({
       'invalid': Sky.rgb(255, 192, 203),
       'crisp-br': Sky.rgb(220, 220, 220),
       'gentle-br': Sky.rgb(240, 240, 240),
+      'focus-br': Sky.rgb(169, 209, 225),
       'white-bg': Sky.rgb(255, 255, 255),
+      'faint-bg': Sky.rgb(252, 252, 252),
       'light-bg': Sky.rgb(246, 246, 246),
       'light-text': Sky.rgb(110, 110, 110)
     }

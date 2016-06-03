@@ -526,6 +526,8 @@ Elem.prototype.update({
     return this;
   },
   apply: function (a) {
+    if (a instanceof Function)
+      return a(this)
     if (typeof(a) == 'string')
       return this.txt(a)
     return this[a[0]].apply(this, a.slice(1))
@@ -557,7 +559,7 @@ Elem.prototype.update({
     return this;
   },
   upon: function (types, fun, capture) {
-    var f = function (e) { return fun.call(this, e.detail.value, e) }
+    var self = this, f = function (e) { return fun.call(self, e.detail.value, e) }
     return this.on(types, f, capture)
   },
   once: function (types, fun, capture) {
@@ -739,7 +741,7 @@ Elem.prototype.update({
   },
 
   load: function (json) {
-    var n = this.node, t = n.type;
+    var n = this.node, t = n.type, json = n.name ? json[n.name] : json;
     if (json !== undefined) {
       if (t == 'button' || t == 'reset' || t == 'submit')
         return this;
@@ -754,7 +756,7 @@ Elem.prototype.update({
             i.checked = true;
         })
       else if (t == 'checkbox' || t == 'radio')
-        n.checked = json == n.value;
+        n.checked = isFinite(json) ? json : json == n.value;
       else if (n.value !== undefined)
         n.value = json || ''
       else if (n.childElementCount)
@@ -824,6 +826,12 @@ Elem.prototype.update({
     var label = pop(desc, 'label')
     var elem = label ? this.label(label) : this;
     return elem.child('input', desc, props)
+  },
+  output: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var elem = label ? this.label(label) : this;
+    return elem.child('output', desc, props)
   },
   fieldset: function (desc) {
     var desc = up({}, desc)

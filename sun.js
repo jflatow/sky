@@ -124,6 +124,10 @@ var fold = function (f, a, o) {
   return a;
 }
 
+var map = function (o, f) {
+  return fold(function (a, i, k) { return a.push(f(i, k, o)), a }, [], o)
+}
+
 var all = function (o, f) {
   var f = f || function (x) { return !!x }
   return fold(function (a, i, k) { return a && f(i, k) }, true, o)
@@ -192,6 +196,7 @@ var Sun = module.exports = {
   find: find,
   first: first,
   fold: fold,
+  map: map,
   all: all,
   any: any,
   get: get,

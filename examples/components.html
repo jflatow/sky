@@ -182,14 +182,13 @@
              setOpts: function (o, f) {
                var opts = this.stdOpts(o, f, 'menu', {path: ['domains']})
                if (f || o.domains) {
-                 this.domains = opts.domains;
                  this.base.setOpts({
                    head: ['barbell', {
                      body: ['button', {label: 'Domains'}],
                      foot: ['addButton', {action: this.bind('createDomain')}]
                    }]
                  })
-                 U.map(Object.keys(this.domains), this.bind('createDomainItem'))
+                 this.load({domains: opts.domains})
                }
              },
 
@@ -211,8 +210,7 @@
                        action: function () {
                          if (popup.validate()) {
                            var data = popup.dump()
-                           self.domains[data.id] = {settings: {label: data.id}}
-                           self.createDomainItem(data.id)
+                           self.obtainItemFor([data.id, {settings: {label: data.id}}])
                            self.selectPath(['domains', data.id])
                            popup.activate(false)
                          }
@@ -223,53 +221,10 @@
                })
              },
 
-             createDomainItem: function (id) {
-               var self = this;
-               var domain = this.lookupPath(['domains']).createItem(['pillar', {
-                 classes: ['menu-item'],
-                 mutex: true,
-                 path: [id],
-                 head: ['barbell', {
-                   body: ['button', {
-                     label: this.domains[id].settings.label,
-                     action: this.bind('selectPath', ['domains', id])
-                   }]
-                 }],
-                 upon: {
-                   activated: function (b) {
-                     b && console.log("nav.go({tag: 'domain'})", id)
-                   }
-                 }
-               }])
-
-               domain.createItem(['pillar', {
-                 classes: ['menu-item'],
-                 path: ['plugs'],
-                 head: ['barbell', {
-                   body: ['button', {label: 'Plugs'}],
-                   foot: ['addButton', {action: this.bind('createPlug', id)}]
-                 }]
-               }])
-               domain.createItem(['pillar', {
-                 classes: ['menu-item'],
-                 path: ['users'],
-                 head: ['barbell', {
-                   body: ['button', {label: 'Users', action: this.bind('selectPath', ['domains', id, 'users'])}],
-                 }],
-                 upon: {
-                   activated: function (b) {
-                     b && console.log("nav.go({tag: 'users'})", id)
-                   }
-                 }
-               }])
-
-               U.map(self.domains[id].plugs, this.bind('createPlugItem', id))
-               return domain;
-             },
-
              createPlug: function (id) {
                var self = this;
                var popup = this.elem.popup({
+                 ax: 1,
                  abox: this.elem.bbox(true),
                  fixed: true,
                  body: ['stack', {
@@ -294,9 +249,9 @@
                        label: 'OK',
                        action: function () {
                          if (popup.validate()) {
-                           var data = popup.dump()
-                           self.createPlugItem(id, [data.type, data.name])
-                           self.selectPath(['domains', id, 'plugs', data.type, data.name])
+                           var data = popup.dump(), p = [data.type, data.name]
+                           self.lookupPath(['domains', id, 'plugs']).obtainItemFor(p)
+                           self.selectPath(['domains', id, 'plugs', p])
                            popup.activate(false)
                          }
                        }
@@ -306,19 +261,61 @@
                })
              },
 
-             createPlugItem: function (id, p) {
-               var prefix = ['domains', id, 'plugs']
-               var plugs = this.lookupPath(prefix)
-               plugs.createItem(['barbell', {
+             item: function (id, datum) {
+               var menu = this, domain = Sun.val(datum)
+               return ['pillar', {
                  classes: ['menu-item'],
-                 path: p,
-                 body: ['button', {label: p[1], action: this.bind('selectPath', prefix.concat(p))}],
+                 mutex: true,
+                 head: ['barbell', {
+                   body: ['button', {
+                     label: domain.settings.label,
+                     action: menu.bind('selectPath', ['domains', id])
+                   }]
+                 }],
                  upon: {
                    activated: function (b) {
-                     b && console.log("lookup plug and go", prefix, p)
+                     b && console.log("nav.go({tag: 'domain'})", id)
                    }
-                 }
-               }])
+                 },
+                 body: ['stack', {
+                   items: [
+                     ['pillar', {
+                       classes: ['menu-item'],
+                       path: ['plugs'],
+                       head: ['barbell', {
+                         body: ['button', {label: 'Plugs'}],
+                         foot: ['addButton', {action: menu.bind('createPlug', id)}]
+                       }],
+                       peel: function (json) { return [json] },
+                       wrap: function (json) { return json[0] },
+                       item: function (p) {
+                         var prefix = ['domains', id, 'plugs']
+                         return ['barbell', {
+                           classes: ['menu-item'],
+                           body: ['button', {label: p[1], action: menu.bind('selectPath', prefix.concat([p]))}],
+                           upon: {
+                             activated: function (b) {
+                               b && console.log("lookup plug and go", prefix, p)
+                             }
+                           }
+                         }]
+                       }
+                     }],
+                     ['pillar', {
+                       classes: ['menu-item'],
+                       path: ['users'],
+                       head: ['barbell', {
+                         body: ['button', {label: 'Users', action: this.bind('selectPath', ['domains', id, 'users'])}],
+                       }],
+                       upon: {
+                         activated: function (b) {
+                           b && console.log("nav.go({tag: 'users'})", id)
+                         }
+                       }
+                     }]
+                   ]
+                 }]
+               }]
              }
            })
          })
@@ -373,7 +370,7 @@
                        path: ['eauth', 'allowed_redirects'],
                        epithet: 'Allowed redirect URIs',
                        advice: 'After authentication, users will only be sent to URIs in the following list:',
-                       control: ['textarea'] // XXX uri list (token input)
+                       control: ['tokenListEditor']
                      }],
                      ['field', {
                        path: ['eauth', 'check_address_uri'],
@@ -386,8 +383,9 @@
                  ['listEditor', {
                    path: ['eauth', 'providers'],
                    title: 'Authentication providers',
-                   item:
-                   ['stack', {
+                   peel: function (json) { return json[1] },
+                   wrap: function (json) { return [json.provider, json] },
+                   item: ['stack', {
                      items: [
                        ['field', {
                          path: ['provider'],
@@ -464,7 +462,10 @@
              })
              Settings.load({
                domain_label: 'LogBaseD',
-               email: {module: 'sendgrid'}
+               email: {module: 'sendgrid'},
+               eauth: {
+                 allowed_redirects: ['https://app.logbased.io/some/redirect']
+               }
              })
              console.log(Settings.dump())
 

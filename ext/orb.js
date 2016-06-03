@@ -17,6 +17,7 @@ var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
   bind: Sky.Elem.prototype.bind,
   does: function (k, f, a) { return Orb.do(this[k], f, a), this },
   prop: function (f, a) { return Orb.do(this.jack, f, a) },
+  call: function (f) { return Orb.do(this, f, [].slice.call(arguments, 1)) },
   grab: function () { this.grip = (this.grip || 0) + 1; return this.prop('grab', arguments) },
   free: function () { this.grip = (this.grip || 0) - 1; return this.prop('free', arguments) },
   move: function () { return this.prop('move', arguments) },
@@ -76,8 +77,9 @@ var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
 Orb = module.exports = up(Orb, {
   do: function (o, f, a, s) {
     if (o) {
-      if (o[f])
-        return o[f].apply(o, a)
+      var v = o[f]
+      if (v)
+        return v instanceof Function ? v.apply(o, a) : v;
       if (o instanceof Array)
         return o.reduce(function (s, i) { return Orb.do(i, f, a) || s }, s)
     }
@@ -96,10 +98,10 @@ Orb = module.exports = up(Orb, {
         Object.defineProperty(o, k, {get: function () { return p[k] }})
       })
     return Sun.fold(function (o, i) {
-      var k = i[0], f = i[1]
+      var k = i[0], b = i[1]
       Object.defineProperty(o, k, {
         configurable: true,
-        get: function () { return this[f] && this[f][k] },
+        get: function () { return this[b] && this[b][k] },
         set: function (v) {
           Object.defineProperty(this, k, {value: v, configurable: true, writable: true})
         }
