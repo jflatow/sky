@@ -36,7 +36,7 @@
         fill: red;
       }
 
-      .button {
+      .trigger {
         cursor: pointer;
         color: blue;
         fill: blue;
@@ -172,7 +172,7 @@
           var keys = ['Meet', 'Call', 'Coffee', 'Drink', 'Lunch', 'Dinner']
           dims.grid(function (a, b, i, j, n) {
             var what = keys[n]
-            var btn = a.button(function () { win.do('open', 'who', data.update({what: what})) })
+            var btn = a.trigger(function () { win.do('open', 'who', data.update({what: what})) })
             Activity(btn, {dims: b, what: what})
             return a;
           }, elem.g(), {rows: 3, cols: 2})
@@ -195,11 +195,10 @@
           var dims = win.dims.trim(tbar.dims.h, 0, 0, 0)
           var elem = win.content;
 
-          data.update({who: 'Just me'}) // XXX
+          data.update({who: 'Just me'})
 
           elem.textX(dims, data.get('what'))
-          elem.button(function () {
-            // wait for make_request
+          elem.trigger(function () {
             win.do('step', 'when', data)
           }).textX(dims, 'Next', 0, .5)
 
@@ -214,10 +213,10 @@
           var dims = win.dims.trim(tbar.dims.h, 0, 0, 0)
           var elem = win.content;
 
-          data.update({when: new Date}) // XXX
+          data.update({when: new Date})
 
           elem.textX(dims, data.get('who'))
-          elem.button(win.action('step', 'where', data)).textX(dims, 'Next', 0, .5)
+          elem.trigger(win.action('step', 'where', data)).textX(dims, 'Next', 0, .5)
         }
 
         main.pages.where.draw = function (win) {
@@ -228,10 +227,10 @@
           var dims = win.dims.trim(tbar.dims.h, 0, 0, 0)
           var elem = win.content;
 
-          data.update({where: 'Palo Alto'}) // XXX
+          data.update({where: 'Palo Alto'})
 
           elem.textX(dims, data.get('when'))
-          elem.button(win.action('step', 'review', data)).textX(dims, 'Next', 0, .5)
+          elem.trigger(win.action('step', 'review', data)).textX(dims, 'Next', 0, .5)
         }
 
         main.pages.review.draw = function (win) {
@@ -243,8 +242,7 @@
           var elem = win.content;
 
           elem.textX(dims, data.get('where'))
-          elem.button(function () {
-            // wait for make_proposal
+          elem.trigger(function () {
             win.do('shut', data)
           }).textX(dims, 'Skej', 0, .5)
         }

@@ -134,7 +134,7 @@
     var svg = Sky.svg().addTo(paper)
 
     SVG = svg.style({width: win.w + 'px', height: win.h + 'px'})
-    CNS = svg.text().align(dim, .9, 0)
+    CNS = svg.text().align(dim, .9, 0).anchor(1)
     var dims = Sky.box(0, 0, 400, 300).center(dim.midX, dim.midY)
     var picker = svg.dateTimePicker(null, {dims: dims})
     picker.on('time', function (t) {

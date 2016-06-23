@@ -40,7 +40,7 @@
         var poi = map.add(function (g) {
           g.circle(0, 0, 20);
           g.rect(-10, -10, 20, 20).attrs({fill: 'white'});
-          g.text(20, 8, 'ucafe').attrs({'font-size': 24});
+          g.text('ucafe').xy(20, 8).attrs({'font-size': 24});
           return g.wagon();
         });
 

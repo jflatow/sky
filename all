@@ -5,10 +5,11 @@ Sky = require('../sky')
 Sun = require('../sun')
 Geo = require('../ext/geo')
 Orb = require('../ext/orb')
-UFO = require('../nav/ufo')
-iOS = require('../nav/ios')
+UFO = require('../kit/ufo')
+Std = require('../kit/std')
+iOS = require('../kit/ios')
 
-},{"../ext/geo":3,"../ext/orb":4,"../nav/ios":5,"../nav/ufo":6,"../sky":7,"../sun":8}],3:[function(require,module,exports){
+},{"../ext/geo":3,"../ext/orb":4,"../kit/ios":5,"../kit/std":6,"../kit/ufo":7,"../sky":8,"../sun":9}],3:[function(require,module,exports){
 var Sky = require('../sky')
 var Sun = require('../sun')
 var Orb = require('./orb')
@@ -71,7 +72,7 @@ Sky.SVGElem.prototype.update({
       return box.grid(function (a, b, i, j, k) {
         var m = 0, n = 0;
         var tile = tiles.g().transform({translate: [~~b.x, ~~b.y]})
-        var img = tile.image(0, 0, b.w, b.h, mts.tile(b.x, b.y, z))
+        var img = tile.image(mts.tile(b.x, b.y, z), b.w, b.h)
         var loop = tile.loop(null, {
           bbox: box,
           wrap: function (wx, wy) {
@@ -113,7 +114,7 @@ Sky.SVGElem.prototype.update({
   })
 })
 
-},{"../sky":7,"../sun":8,"./orb":4}],4:[function(require,module,exports){
+},{"../sky":8,"../sun":9,"./orb":4}],4:[function(require,module,exports){
 var Sky = require('../sky')
 var Sun = require('../sun')
 var U = Sky.util;
@@ -129,32 +130,77 @@ var pointerdown = touch ? 'touchstart' : 'mousedown';
 var pointermove = touch ? 'touchmove' : 'mousemove';
 var pointerup = touch ? 'touchend touchcancel' : 'mouseup';
 
-var Orb = Sun.cls(function Orb(obj, jack, elem) {
-  this.jack = jack || this.jack;
-  this.elem = elem || this.elem;
-  this.grip = 0;
-  up(this, obj)
-}, {
+var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
+  bind: Sky.Elem.prototype.bind,
+  does: function (k, f, a) { return Orb.do(this[k], f, a), this },
   prop: function (f, a) { return Orb.do(this.jack, f, a) },
-  grab: function () { this.grip++; return this.prop('grab', arguments) },
-  free: function () { this.grip--; return this.prop('free', arguments) },
+  call: function (f) { return Orb.do(this, f, [].slice.call(arguments, 1)) },
+  grab: function () { this.grip = (this.grip || 0) + 1; return this.prop('grab', arguments) },
+  free: function () { this.grip = (this.grip || 0) - 1; return this.prop('free', arguments) },
   move: function () { return this.prop('move', arguments) },
   push: function () { return this.prop('move', arguments) },
   sync: function () { return this.prop('sync', arguments) },
   drag: function (f, a) { return Orb.drag(this, f, a) },
-  walk: function (f, a) { return Orb.walk(this, f, a) },
-  thru: function (o, a) { return Orb.thru(this, o, a) }
+  thru: function (o, a) { return Orb.thru(this, o, a) },
+  walk: function (k, f, a) {
+    for (var o = this; o[k]; o = o[k]);
+    return f ? Orb.do(o, f, a) : o;
+  },
+  find: function (f, a) {
+    var kids = this.kids || []
+    for (var i = 0, v; i < kids.length; i++)
+      if ((v = Orb.do(kids[i], f, a)))
+        return v;
+  },
+  load: function (json) {
+    var path = this.path || []
+    var part = Sun.lookup(json || {}, path)
+    if (this.kids)
+      this.kids.reduce(function (o, k) { return k.load(o), o }, part)
+    else
+      this.elem.load(part)
+    return this;
+  },
+  dump: function (json) {
+    var path = this.path || []
+    var part = Sun.lookup(json || {}, path)
+    if (this.kids)
+      part = this.kids.reduce(function (o, k) { return k.dump(o) }, part)
+    else
+      part = this.elem.dump(part)
+    return Sun.modify(json, path, part)
+  },
+  hide: function () { return this.does('elem', 'hide', arguments) },
+  show: function () { return this.does('elem', 'show', arguments) },
+  order: function () { return this.does('elem', 'order', arguments) },
+  remove: function (b) { return this.does('elem', 'remove', arguments) },
+  activate: function (b, r) {
+    if (dfn(r, false))
+      this.does('kids', 'activate', arguments)
+    return this.does('elem', 'activate', arguments)
+  },
+  collapse: function (b, r) {
+    if (dfn(r, true))
+      this.does('kids', 'collapse', arguments)
+    return this.does('elem', 'collapse', arguments)
+  },
+  validate: function (b) {
+    if (this.kids)
+      return this.kids.reduce(function (a, k) { return k.validate(a) }, dfn(b, true))
+    return this.elem && this.elem.validate(b)
+  }
 })
+
 Orb = module.exports = up(Orb, {
-  do: function (o, f, a) {
+  do: function (o, f, a, s) {
     if (o) {
-      if (o[f])
-        return o[f].apply(o, a)
+      var v = o[f]
+      if (v)
+        return v instanceof Function ? v.apply(o, a) : v;
       if (o instanceof Array)
-        return o.reduce(function (_, i) { return Orb.do(i, f, a) }, 0)
+        return o.reduce(function (s, i) { return Orb.do(i, f, a) || s }, s)
     }
   },
-  call: function (o, f) { return Orb.do(o, f, [].slice.call(arguments, 2)) },
   grab: function (o) { return Orb.do(o, 'grab', [].slice.call(arguments, 1)) },
   free: function (o) { return Orb.do(o, 'free', [].slice.call(arguments, 1)) },
   move: function (o, dx, dy, a, r, g, s) {
@@ -163,18 +209,22 @@ Orb = module.exports = up(Orb, {
   drag: function (o, f, a) {
     return Orb.grab(o), Orb.do(o, f, a), Orb.free(o), o;
   },
-  type: function (cons) {
-    var cons = Sun.cls.extend.apply(cons, cat(new Orb, [].slice.call(arguments, 1)))
-    var func = function (a, r, g, s) { return new cons(this, a, r, g, s) }
-    return up(func, {prototype: cons.prototype})
-  },
-  walk: function (o, f, a) {
-    return f.call(o, o.parent ? Orb.walk(o.parent, f, a) : a)
-  },
   thru: function (o, p, a) {
-    return a.map(function (k) {
-      Object.defineProperty(o, k, {get: function () { return p[k] }})
-    })
+    if (a instanceof Array)
+      return a.map(function (k) {
+        Object.defineProperty(o, k, {get: function () { return p[k] }})
+      })
+    return Sun.fold(function (o, i) {
+      var k = i[0], b = i[1]
+      Object.defineProperty(o, k, {
+        configurable: true,
+        get: function () { return this[b] && this[b][k] },
+        set: function (v) {
+          Object.defineProperty(this, k, {value: v, configurable: true, writable: true})
+        }
+      })
+      return o;
+    }, o, p)
   }
 })
 
@@ -209,15 +259,22 @@ Sky.Elem.prototype.update({
 
   dbltap: function (fun, opts) {
     var opts = up({gap: 250}, opts)
-    var self= this, taps = 0;
-    this.on(pointerdown, function (e) {
+    var self = this, taps = 0;
+    return this.on(pointerdown, function (e) {
       if (taps++)
         fun && fun.apply(self, arguments)
       setTimeout(function () { taps = 0 }, opts.gap)
       if (opts.prevent)
         e.preventDefault()
     })
-    return this;
+  },
+
+  tapout: function (fun, opts) {
+    var self = this, dead;
+    return this.doc().til(pointerup, function (e) {
+      if (!self.node.contains(e.target))
+        dead = fun && fun.apply(self, arguments) || true;
+    }, function () { return dead }, true)
   },
 
   press: function (o, opts) {
@@ -282,7 +339,7 @@ Sky.Elem.prototype.update({
   },
 
   orb: function (obj, jack) {
-    return new Orb(obj, jack, this)
+    return new Orb(up({elem: this, jack: jack}, obj))
   },
 
   amp: Orb.type(function Amp(elem, jack, opts) {
@@ -714,7 +771,7 @@ Sky.SVGElem.prototype.update({
   })
 })
 
-},{"../sky":7,"../sun":8}],5:[function(require,module,exports){
+},{"../sky":8,"../sun":9}],5:[function(require,module,exports){
 var Sky = require('../sky')
 var Sun = require('../sun')
 var Orb = require('../ext/orb')
@@ -722,12 +779,12 @@ var UFO = require('./ufo')
 var P = Sky.path, up = Sun.up;
 
 Sky.Elem.prototype.update({
-  button: function (fun, opts, jack) {
-    return this.g({class: 'button'}).tap(fun, opts, jack)
-  },
   chevron: function (cx, cy, w, h, t) {
     var box = Sky.box(0, 0, Math.abs(w), Math.abs(h || 2 * w))
     return this.svgX(box.center(cx, cy)).chevron(cx, cy, w, h, t)
+  },
+  trigger: function (fun, opts, jack) {
+    return this.g({class: 'trigger'}).tap(fun, opts, jack)
   }
 })
 
@@ -831,23 +888,23 @@ var iOS7x = UFO.derive({
       var bgrd = this.bgrd = elem.rect(x, y, w, h)
 
       if (left) {
-        var lbtn = this.lbtn = elem.button(function () { left.action() }).addClass('left')
-        lbtn.text(x + 3 * q, m, left.label).anchor(-1, 0)
+        var lbtn = this.lbtn = elem.trigger(function () { left.action() }).addClass('left')
+        lbtn.text(left.label).xy(x + 3 * q, m).anchor(-1, 0)
         lbtn.rectX(b[0]).order(0)
       } else if (prev) {
-        var back = this.back = elem.button(function () { win.action('back')(state.data) }).addClass('back')
+        var back = this.back = elem.trigger(function () { win.action('back')(state.data) }).addClass('back')
         back.chevron(x + 3 * q, m, -2 * q)
-        back.text(x + 5 * q, m, nav.pages[prev.tag].title).anchor(-1, 0)
+        back.text(nav.pages[prev.tag].title).xy(x + 5 * q, m).anchor(-1, 0)
         back.rectX(b[0]).order(0)
       }
       if (right) {
-        var rbtn = this.rbtn = elem.button(function () { right.action() }).addClass('right')
-        rbtn.text(dims.right - 3 * q, m, right.label).anchor(1, 0)
+        var rbtn = this.rbtn = elem.trigger(function () { right.action() }).addClass('right')
+        rbtn.text(right.label).xy(dims.right - 3 * q, m).anchor(1, 0)
         rbtn.rectX(b[2]).order(0)
       }
 
       var tbar = this.tbar = elem.g()
-      tbar.text(dims.midX, m, title).anchor(0, 0).addClass('title')
+      tbar.text(title).xy(dims.midX, m).anchor(0, 0).addClass('title')
 
       win.plugs.push({
         move: function (px) {
@@ -862,19 +919,627 @@ var iOS = module.exports = {
   iOS7x: iOS7x
 }
 
-},{"../ext/orb":4,"../sky":7,"../sun":8,"./ufo":6}],6:[function(require,module,exports){
+},{"../ext/orb":4,"../sky":8,"../sun":9,"./ufo":7}],6:[function(require,module,exports){
+var Sky = require('../sky')
+var Sun = require('../sun')
+var Orb = require('../ext/orb')
+var UFO = require('../kit/ufo')
+
+var U = Sky.util, P = Sky.path, dfn = U.dfn, pop = U.pop, pre = U.pre;
+var L = Sun.list, up = Sun.up, cat = Sun.cat, get = Sun.get, map = Sun.map;
+
+var optify = function (opts, key, over) {
+  return up((opts instanceof Object) ? opts : Sun.object([[key, opts]]), over)
+}
+
+var prepend = function (opts, path, pre) {
+  return Sun.modify(opts, path, function (v) { return cat(pre, v) })
+}
+
+var Widget = Orb.derive({
+  stdOpts: function (o, f, c, d) {
+    var opts = this.opts = up(f ? d || {} : this.opts, o)
+    if (f || o.classes)
+      this.elem.attrs({class: c || ''}).addClass(opts.classes)
+    if (o.style)
+      this.elem.style(opts.style)
+    if (o.upon)
+      Sun.fold(function (e, i, w) { return e.upon(i[0], i[1]) }, this.elem, o.upon)
+    return opts;
+  },
+
+  // direct manipulation methods
+  createKid: function (desc, elem) {
+    var kid = (elem || this.elem).apply(desc)
+    return L.append(pre(this, 'kids', []), kid), kid;
+  },
+  removeKid: function (kid) {
+    return L.drop(pre(this, 'kids', []), kid), kid.remove()
+  },
+  removeKids: function () {
+    // NB: remove mutates list: must use copy-map
+    return map(this.kids.slice(), this.removeKid.bind(this))
+  },
+  selectKid: function (kid) {
+    map(this.kids, function (k) {
+      k.activate(k === kid)
+      k.collapse(k !== kid)
+    })
+  },
+
+  // delegation methods for managing other widgets
+  // item(s) refers to member(s) of the collection
+  // NB: could index paths here for faster access
+  createItem: function (desc) {
+    return this.walk('body', 'createKid', [desc])
+  },
+  removeItem: function (item) {
+    return this.walk('body', 'removeKid', [item])
+  },
+  selectItem: function (item) {
+    return this.walk('body', 'selectKid', [item])
+  },
+
+  removeItems: function (items) {
+    return map(items || this.getItems(), this.bind('removeItem'))
+  },
+
+  // collection either has keys or not, default is based on item template
+  collectionKey: function (datum) {
+    if (dfn(this.keys, this.item instanceof Function))
+      return Sun.key(datum)
+  },
+
+  getItems: function () {
+    return this.walk('body').kids.slice()
+  },
+  findItem: function (key) {
+    var path = [key]
+    if (key != null)
+      return Sun.first(this.getItems(), function (i) { return Sun.equals(i.path, path) })
+  },
+
+  // obtain & remove items from data (infers descriptors)
+  // if widget is a collection, it manages its items using data
+  obtainItemFor: function (datum) {
+    var datum = this.peel(datum), key = this.collectionKey(datum)
+    var item = this.findItem(key) || this.createItem(this.call('item', key, datum))
+    if (key)
+      item.path = [key]
+    return item.load(key == null ? datum : [datum])
+  },
+  removeItemFor: function (datum) {
+    var datum = this.peel(datum), key = this.collectionKey(datum)
+    var item = this.findItem(key)
+    return item && this.removeItem(item)
+  },
+
+  obtainItemsFor: function (data) {
+    return map(data, this.bind('obtainItemFor'))
+  },
+  removeItemsFor: function (data) {
+    return map(data, this.bind('removeItemFor'))
+  },
+
+  peel: function (json) { var f = this.opts.peel; return f ? f.call(this, json) : json },
+  wrap: function (json) { var f = this.opts.wrap; return f ? f.call(this, json) : json },
+  load: function (json) {
+    if (this.item) {
+      this.removeItems()
+      this.obtainItemsFor(Sun.lookup(json || {}, this.path || []))
+      return this;
+    }
+    return Orb.prototype.load.apply(this, arguments)
+  },
+
+  dump: function (json) {
+    if (this.item) {
+      var wrap = this.bind('wrap')
+      var data = map(this.getItems(), function (i) {
+        return wrap(i.path ? i.dump([])[0] : i.dump())
+      })
+      return Sun.modify(json, this.path || [], data)
+    }
+    return Orb.prototype.dump.apply(this, arguments)
+  },
+
+  // path manipulation methods
+  lookupPath: function (path) {
+    var p = this.path || []
+    for (var i = 0; i < p.length; i++)
+      if (path[i] != p[i])
+        return;
+    if (i == path.length)
+      return this;
+    return this.find('lookupPath', [path.slice(i)])
+  },
+  removePath: function (path, parent) {
+    var p = this.path || []
+    for (var i = 0; i < p.length; i++)
+      if (path[i] != p[i])
+        return;
+    if (i == path.length)
+      return parent ? parent.removeItem(this) : this.remove()
+    return this.find('removePath', [path.slice(i), this])
+  },
+  selectPath: function (path) {
+    // NB: parent is not active if child is, but does not collapse
+    //     hopefully CSS :has(.activated) will be supported soon...
+    var p = this.path || [], e = this.opts.mutex;
+    for (var i = 0; i < p.length; i++)
+      if (path[i] != p[i])
+        return e && this.collapse(true), this.activate(false, true), false;
+    if (i == path.length)
+      return this.activate().collapse(false)
+    if (Orb.do(this.kids, 'selectPath', [path.slice(i)]))
+      return this.activate(false).collapse(false, false)
+    return e && this.collapse(true, false), this.activate(false), false;
+  }
+})
+
+// The default for Widgets is to proxy key variables through the base
+// methods are parameterized by the variables, as opposed to propagating
+// e.g. createKid operates on the 'elem' & 'kids', rather than calling base itself
+
+Orb.thru(Widget.prototype, {
+  head: 'base',
+  body: 'base',
+  foot: 'base',
+  elem: 'base',
+  kids: 'base',
+  opts: 'base',
+  path: 'opts',
+  item: 'opts'
+})
+
+Sky.Elem.prototype.update({
+  stack: Widget.type(function Stack(root, opts, elem) {
+    this.elem = elem || root.g()
+    this.kids = []
+    this.setOpts(opts || {}, true)
+  }, {
+    setOpts: function (o, f) {
+      var self = this;
+      var opts = this.stdOpts(o, f, 'stack')
+      if (f || o.items) {
+        this.removeKids()
+        map(opts.items, function (k) { self.createKid(k) })
+      }
+    },
+
+    collapse: function (b, r) {
+      this.kids.reduce(function (r, kid, i) {
+        if (r)
+          kid.collapse(b, r)
+        if (i)
+          kid.hide(b, r)
+        return r
+      }, dfn(r, true))
+      return this.does('elem', 'collapse', arguments)
+    }
+  }),
+
+  barbell: Widget.type(function Barbell(root, opts) {
+    this.elem = root.g().flex(['fit', '100%', 'fit'], true)
+    this.kids = []
+    this.setOpts(opts || {}, true)
+  }, {
+    __css__: {
+      '.barbell': {
+        'align-items': 'center'
+      }
+    },
+
+    setOpts: function (o, f) {
+      var self = this;
+      var opts = this.stdOpts(o, f, 'barbell')
+      if (f || o.head || o.body || o.foot) {
+        this.removeKids()
+        map(['head', 'body', 'foot'], function (k, i) {
+          var elem = self.elem.nth(i).addClass(k)
+          self[k] = opts[k] && self.createKid(opts[k], elem)
+        })
+      }
+    }
+  }),
+
+  pillar: Widget.type(function Pillar(root, opts) {
+    this.elem = root.g()
+    this.kids = []
+    this.setOpts(opts || {}, true)
+  }, {
+    setOpts: function (o, f) {
+      var self = this;
+      var opts = this.stdOpts(o, f, 'pillar', {body: ['stack']})
+      if (f || o.head || o.body || o.foot) {
+        this.removeKids()
+        map(['head', 'body', 'foot'], function (k, i) {
+          self[k] = opts[k] && self.createKid(opts[k])
+          self[k] && self[k].elem.addClass(k)
+        })
+      }
+    },
+
+    collapse: function (b, r) {
+      if (dfn(r, true))
+        this.kids.map(function (kid) { kid.collapse(b, r) })
+      this.does('body', 'hide', arguments)
+      return this.does('elem', 'collapse', arguments)
+    }
+  }),
+
+  field: Widget.type(function Field(root, opts) {
+    this.elem = root.g()
+    this.kids = []
+    this.setOpts(opts || {}, true)
+  }, {
+    __css__: function (theme) {
+      return {
+        '.field': {
+          'margin': '1em 1.5em'
+        },
+
+        '.field.inline': {
+          'display': 'flex',
+          'align-items': 'center'
+        },
+        '.field.inline .description': {
+          'flex': '1 1 80%'
+        },
+        '.field.inline .epithet': {
+          'padding': '0 2em 0 0'
+        },
+        '.field.inline .control': {
+          'flex': '0 0 auto'
+        },
+
+        '.field .epithet:empty, .field .advice:empty': {
+          'display': 'none'
+        },
+        '.field .epithet': {
+          'padding': '0 0 1ex 0',
+          'font-size': '0.8em',
+          'font-weight': 600
+        },
+        '.field .advice': {
+          'padding': '0 0 1ex 0',
+          'font-size': '0.8em',
+          'white-space': 'pre-line',
+          'color': theme.color('light-text')
+        },
+
+        '.field .control label': {
+          'display': 'inline-flex',
+          'flex-direction': 'row-reverse',
+          'align-items': 'center',
+          'font-size': '0.8em'
+        },
+        '.field .control label input': {
+          'margin': '0 1ex'
+        },
+        '.field .control label + label': {
+          'margin-left': '1ex'
+        },
+        '.field .control .invalidated': {
+          'outline': theme.border('invalid', 3)
+        }
+      }
+    },
+
+    setOpts: function (o, f) {
+      var opts = this.stdOpts(o, f, 'field')
+      var desc = this.elem.q('description')
+      var ctrl = this.elem.q('control')
+      desc.q('epithet').txt(opts.epithet || '')
+      desc.q('advice').txt(opts.advice || '')
+      if (f || o.control) {
+        this.removeKids()
+        this.createKid(opts.control || ['input'], ctrl)
+      }
+    },
+
+    collapse: function (b, r) {
+      this.elem.each('.advice', function (e) { Sky.$(e).hide(b) })
+      return this.does('elem', 'collapse', arguments)
+    }
+  }),
+
+  panel: Widget.type(function Panel(root, opts) {
+    this.base = root.pillar()
+    this.setOpts(opts || {}, true)
+  }, {
+    __css__: function (theme) {
+      return {
+        '.panel': {
+          'margin-bottom': '1em',
+          'border': theme.border('crisp-br')
+        },
+
+        '.panel > .title-bar': {
+          'background-color': theme.color('light-bg'),
+          'border-bottom': theme.border('crisp-br')
+        },
+
+        '.panel > .title-bar .body': {
+          'padding': '1em'
+        }
+      }
+    },
+
+    setOpts: function (o, f) {
+      var opts = this.stdOpts(o, f, 'panel')
+      if (f || o.title || o.items || o.status) {
+        var b = {}
+        if (opts.title)
+          b.head = ['barbell', prepend(optify(opts.title, 'body'), ['classes'], ['title-bar'])]
+        if (opts.items)
+          b.body = ['stack', {items: opts.items}]
+        if (opts.status)
+          b.foot = ['barbell', prepend(optify(opts.status, 'body'), ['classes'], ['status-bar'])]
+        this.base.setOpts(b)
+      }
+    }
+  }),
+
+  popup: Widget.type(function Popup(root, opts) {
+    this.base = root.pillar()
+    this.setOpts(opts || {}, true)
+    this.elem.tapout(this.activate.bind(this, false))
+    this.activate()
+  }, {
+    __css__: function (theme) {
+      return {
+        '.popup': {
+          'padding': '1ex',
+          'background-color': theme.color('white-bg'),
+          'box-shadow': theme.shadow('crisp-br', 0, 0, 3),
+          'border': theme.border('crisp-br')
+        }
+      }
+    },
+
+    setOpts: function (o, f) {
+      var opts = this.stdOpts(o, f, 'popup', {dismiss: 'remove'})
+      var ax = dfn(opts.ax, 0), ay = dfn(opts.ay, 0),
+          bx = dfn(opts.bx, -ax), by = dfn(opts.by, -ay),
+          dx = dfn(opts.dx, 16 * ax), dy = dfn(opts.dy, 16 * ay)
+      var abox = (opts.abox || this.elem.parent().bbox(opts.fixed))
+      var elem = this.elem
+          .align(abox.shift(dx, dy), ax, ay).anchor(bx, by)
+          .style({position: opts.fixed ? 'fixed' : 'absolute', zIndex: 1})
+      if (f || o.items)
+        this.base.setOpts(Sun.select(opts, ['head', 'body', 'foot']))
+    },
+
+    activate: function (b, r) {
+      Widget.prototype.activate.apply(this, arguments)
+      return this[this.opts.dismiss](!dfn(b, true)), this;
+    }
+  }),
+
+  listEditor: Widget.type(function ListEditor(root, opts) {
+    this.base = root.panel()
+    this.setOpts(opts || {}, true)
+  }, {
+    __css__: function (theme) {
+      return {
+        '.list-editor .stack:empty': {
+          'padding': '1em',
+          'text-align': 'center'
+        },
+
+        '.list-editor .stack:empty::after': {
+          'content': '"No items"',
+          'font-size': '0.8em',
+          'color': theme.color('light-text')
+        },
+
+        '.list-editor-item + .list-editor-item': {
+          'border-top': theme.border('gentle-br')
+        },
+
+        '.list-editor-item .foot': {
+          'opacity': 0,
+          'transition': 'opacity 0.3s'
+        },
+
+        '.list-editor-item:hover .foot': {
+          'opacity': 1,
+          'transition': 'opacity 0.3s'
+        }
+      }
+    },
+
+    setOpts: function (o, f) {
+      var self = this;
+      var opts = this.stdOpts(o, f, 'panel list-editor')
+      if (f || o.title)
+        this.base.setOpts({
+          title: optify(opts.title, 'body', {
+            foot: ['addButton', {action: function () { self.createItem(self.call('item')) }}]
+          })
+        })
+    },
+
+    createItem: function (desc) {
+      var self = this;
+      var item = Widget.prototype.createItem.call(this, ['barbell', {
+        classes: ['list-editor-item'],
+        body: desc,
+        foot: ['removeButton', {action: function () { self.removeItem(item) }}]
+      }])
+      item.elem.on('click', this.bind('selectItem', item))
+      this.selectItem(item)
+      this.elem.fire('list-change', {editor: this, item: item, kind: 'add'}, {bubbles: true})
+      return item;
+    },
+
+    removeItem: function (item) {
+      var item = Widget.prototype.removeItem.call(this, item)
+      this.elem.fire('list-change', {editor: this, item: item, kind: 'remove'}, {bubbles: true})
+      return item;
+    }
+  }),
+
+  tokenListEditor: Widget.type(function (root, opts) {
+    var self = this;
+    var base = this.base = root.stack({items: [['input']]})
+    var input = this.inp = base.kids.splice(0, 1)[0]
+    input.on('keydown', function (e) {
+      switch (e.which) {
+      case 8: return self.deleteBackward()
+      case 13: return self.confirmEntry()
+      default: return self.activate(false, true)
+      }
+    })
+    this.setOpts(opts || {}, true)
+  }, {
+    __css__: function (theme ) {
+      return {
+        '.token-list-editor': {
+          'display': 'flex',
+          'align-items': 'center',
+          'flex-direction': 'row',
+          'flex-wrap': 'wrap',
+          'border': theme.border('crisp-br'),
+          'padding': '0.5ex',
+          'min-height': '2.5em'
+        },
+        '.token-list-editor output': {
+          'border': theme.border('gentle-br'),
+          'background-color': theme.color('faint-bg'),
+          'margin': '0.25ex',
+          'padding': '0 1ex',
+          'overflow': 'hidden',
+          'text-overflow': 'ellipsis'
+        },
+        '.token-list-editor output.activated': {
+          'border': theme.border('focus-br'),
+        },
+        '.token-list-editor input': {
+          'flex': '1 1',
+          'margin': '1ex 1.5ex',
+          'border': 'none',
+          'outline': 'none',
+          'min-width': '2em !important'
+        }
+      }
+    },
+
+    setOpts: function (o, f) {
+      var self = this;
+      var opts = this.stdOpts(o, f, 'token-list-editor')
+      if (f || o.input)
+        this.inp.attrs(opts.input)
+    },
+
+    keys: false,
+    item: function () {
+      var self = this;
+      return function (elem) {
+        return elem.output().before(self.inp).upon('click', function () {
+          self.selectKid(this)
+          self.inp.node.focus()
+        })
+      }
+    },
+
+    confirmEntry: function () {
+      var text = this.inp.node.value;
+      if (text) {
+        this.obtainItemFor(text)
+        this.inp.node.value = ''
+      }
+    },
+    deleteBackward: function () {
+      var kids = this.kids, active = Sun.first(kids, function (k) {
+        return k.hasClass('activated') && k;
+      })
+      if (active)
+        return this.removeKid(active)
+      if (this.inp.node.value == '') {
+        if (kids.length)
+          return this.selectKid(L.last(kids))
+      }
+    }
+  }),
+
+  addButton: function (opts) {
+    return this.button(up({class: 'add', icon: '#add'}, opts))
+  },
+  removeButton: function (opts) {
+    return this.button(up({class: 'remove', icon: '#remove'}, opts))
+  }
+})
+
+var Std = module.exports = UFO.derive({
+  Widget: Widget,
+  Nav: UFO.Nav.derive({
+    toHistory: function (state) {
+      var keep = this.path(state)
+      if (state.data)
+        keep.data = state.data;
+      return keep;
+    }
+  }),
+
+  Theme: UFO.Theme.derive({
+    colors: {
+      'invalid': Sky.rgb(255, 192, 203),
+      'crisp-br': Sky.rgb(220, 220, 220),
+      'gentle-br': Sky.rgb(240, 240, 240),
+      'focus-br': Sky.rgb(169, 209, 225),
+      'white-bg': Sky.rgb(255, 255, 255),
+      'faint-bg': Sky.rgb(252, 252, 252),
+      'light-bg': Sky.rgb(246, 246, 246),
+      'light-text': Sky.rgb(110, 110, 110)
+    }
+  }),
+
+  Frame: UFO.Frame.derive({
+    init: function () {
+      this.defs.symbol({id: 'add', viewBox: [-10, -10, 20, 20]})
+        .path(P.arc(0, 0, 10, 10, 360) + 'M-1,-6 h2 v5 h5 v2 h-5 v5 h-2 v-5 h-5 v-2 h5z')
+        .attrs({'fill-rule': 'evenodd'})
+      this.defs.symbol({id: 'remove', viewBox: [-10, -10, 20, 20]})
+        .path(P.arc(0, 0, 10, 10, 360) + 'M-1,-6 h2 v5 h5 v2 h-5 v5 h-2 v-5 h-5 v-2 h5z')
+        .attrs({'fill-rule': 'evenodd'})
+        .transform({rotate: 45})
+    },
+
+    __css__: {
+      '*': {
+        'box-sizing': 'border-box'
+      },
+      '*[hidden]': {
+        'display': 'none !important'
+      },
+
+      'button': {
+        'cursor': 'pointer'
+      },
+
+      '.icon': {
+        'width': '2em',
+        'height': '2em'
+      }
+    }
+  })
+})
+
+},{"../ext/orb":4,"../kit/ufo":7,"../sky":8,"../sun":9}],7:[function(require,module,exports){
 var Sky = require('..')
 var Sun = require('../sun')
 var Orb = require('../ext/orb')
-var U = Sky.util, up = Sun.up, Cage = Sun.Cage;
+var U = Sky.util, def = Sun.def, up = Sun.up, Cage = Sun.Cage;
 
-var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
+var Nav = Cage.subcls(function Nav(pkg, pages, frame, opts) {
   Cage.call(this)
   this.pages = pages instanceof Function ? pages(this) : pages;
   this.frame = frame || pkg.frame()
   this.frame.nav = this;
   this.setOpts(opts)
-}, Cage.prototype, {
+}, {
   setOpts: function (o) {
     var self = this;
     var opts = this.opts = up(this.opts || {manageHistory: false}, o)
@@ -985,7 +1650,7 @@ var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
     return this.push(state, {transition: 'next'})
   },
   back: function (state, data) {
-    var state = up(state.prev, {data: Sun.def(data, state.data)})
+    var state = up(state.prev, {data: def(data, state.data)})
     return this.push(state, {transition: 'prev'})
   },
 
@@ -994,15 +1659,34 @@ var Nav = Sun.cls(function Nav(pkg, pages, frame, opts) {
     return this.push(state, {transition: 'new'})
   },
   shut: function (state, data) {
-    var state = up(state.parent, {data: Sun.def(data, state.data)})
+    var state = up(state.parent, {data: def(data, state.data)})
     return this.push(state, {transition: 'old'})
   }
 })
 
-var Frame = Sun.cls(function Frame(pkg, elem, opts) {
+var Theme = Sun.cls(function Theme() {}, {
+  units: Sky.units,
+  border: function (color, width, style) {
+    return this.units.map(['size', 'brStyle', 'color'],
+                          [width || 1, style || 'solid', this.color(color)]).join(' ')
+  },
+  shadow: function (color, dx, dy, b, s) {
+    return this.units.map(['size', 'size', 'size', 'size', 'color'],
+                          [dx || 0, dy || 0, b || 0, s || 0, this.color(color)]).join(' ')
+  },
+  color: function (name) {
+    return this.lookup(['colors', name])
+  },
+  lookup: function (path, d) {
+    return def(Sun.lookup(this, path), d)
+  }
+})
+
+var Frame = Cage.subcls(function Frame(pkg, elem, opts) {
   Cage.call(this)
   this.elem = elem || Sky.$(document.body)
-  this.style = this.initStyle(pkg)
+  this.defs = this.makeSVGDefs(pkg)
+  this.style = this.loadStyle(pkg)
   this.window = pkg.window;
   this.windows = []
   this.on('top', function (n, o) {
@@ -1012,7 +1696,8 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
     }
   })
   this.setOpts(opts)
-}, Cage.prototype, Orb.prototype, {
+  this.init(pkg)
+}, {
   setOpts: function (o) {
     var self = this;
     this.opts = up(this.opts || {kx: 0}, o)
@@ -1020,33 +1705,39 @@ var Frame = Sun.cls(function Frame(pkg, elem, opts) {
     this.line = this.opts.line || this.dims.copy({h: 20})
     this.windows.map(function (win) { self.nav.redraw(win) })
   },
-  initStyle: function (pkg) {
+  init: function (pkg) { /* override me */ },
+  loadStyle: function (pkg) {
     var frame = this;
+    var addRules = function (s, css) {
+      if (css instanceof Function)
+        s.addRules(css(pkg.theme, frame, pkg))
+      else if (css)
+        s.addRules(css)
+      return s;
+    }
     return [pkg.Frame, pkg.Window, Sky.Elem, Sky.SVGElem].reduce(function (s, c) {
       return Sun.fold(function (s, i) {
         var pro = i[1] && i[1].prototype;
-        var css = pro && pro.__css__;
-        if (css instanceof Function)
-          s.addRules(css(pkg, frame))
-        else if (css)
-          s.addRules(css)
-        return s;
-      }, s, c.prototype)
+        return addRules(s, pro && pro.__css__)
+      }, addRules(s, c.prototype.__css__), c.prototype)
     }, this.makeStyle())
   },
   makeStyle: function () {
     var head = this.elem.doc().$('head')
     return head.child('style').before(head.$('style'))
   },
+  makeSVGDefs: function () {
+    return this.elem.doc().$('head').svg().child('defs')
+  },
   addWindow: function (win) {
     this.windows.push(win)
   },
   removeWindow: function (win) {
     Sun.list.drop(this.windows, win)
-  },
+  }
 })
 
-var Window = Sun.cls(function Window(frame, state, opts) {
+var Window = Cage.subcls(function Window(frame, state, opts) {
   var self = this;
   var elem = this.elem = this.elem || frame.elem;
   var opts = up({detach: this.elem !== frame.elem}, opts)
@@ -1077,12 +1768,13 @@ var Window = Sun.cls(function Window(frame, state, opts) {
   })
   this.setOpts(opts)
   this.frame.addWindow(self)
-}, Cage.prototype, Orb.prototype, {
+}, {
   setOpts: function (o) {
     this.opts = up(this.opts || {kx: this.frame.opts.kx}, o)
     this.jack.setOpts({kx: this.opts.kx})
   },
   doBecomeActive: function () {
+    this.activate()
     this.frame.change('top', this)
   },
   didBecomeActive: function () { this.change('activated', true) },
@@ -1111,6 +1803,7 @@ var Window = Sun.cls(function Window(frame, state, opts) {
 
 var Basic = {
   Nav: Nav,
+  Theme: Theme,
   Frame: Frame,
   Window: Window,
   derive: function (ext) {
@@ -1119,6 +1812,7 @@ var Basic = {
       nav: function (pages, frame, opts) {
         return new pkg.Nav(pkg, pages, frame, opts)
       },
+      theme: new pkg.Theme,
       frame: Orb.type(pkg.Frame),
       window: Orb.type(pkg.Window)
     })
@@ -1127,7 +1821,7 @@ var Basic = {
 
 var UFO = module.exports = Basic.derive({})
 
-},{"..":7,"../ext/orb":4,"../sun":8}],7:[function(require,module,exports){
+},{"..":8,"../ext/orb":4,"../sun":9}],8:[function(require,module,exports){
 var env = require('./env') // NB: imports globals for node, not used directly
 var abs = Math.abs, min = Math.min, max = Math.max, Rt2 = Math.sqrt(2), Inf = Infinity;
 var add = function (p, d) { return isFinite(d) ? p + d : d }
@@ -1136,7 +1830,8 @@ var fnt = function (x, d) { return isFinite(x) ? x : d }
 var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
 var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
 var pre = function (a, k, d) { return a[k] = get(a, k, d) }
-var map = function (a, f) { return a && a.map ? a.map(f) : f(a) }
+var map = function (a, f) { return [].concat(a || []).map(f) }
+var each = function (a, f) { return a && a.map ? a.map(f) : f(a, 0) }
 var wrap = function (node) {
   if (node)
     switch (node.namespaceURI) {
@@ -1169,7 +1864,8 @@ var trig = util.trig = {
   rad: function (a) { return Math.PI / 180 * a },
   sin: function (a) { return Math.sin(trig.rad(a)) },
   cos: function (a) { return Math.cos(trig.rad(a)) },
-  cut: function (x) { return util.clip(x, -359.999, 359.999) }
+  cut: function (x) { return util.clip(x, -359.999, 359.999) },
+  polar: function (r, a) { return [r * trig.cos(a), r * trig.sin(a)] }
 }
 
 var path = function (cmd) { return cmd + [].slice.call(arguments, 1) }
@@ -1284,20 +1980,23 @@ var Q = up(units, {
     rotate: 'deg',
     skewX: 'deg',
     skewY: 'deg',
-    borderRadius: 'px',
+    borderRadius: 'px'
   },
   unify: function (k, v, u) {
     var u = u || Q.defaults, d = u[k] || '';
-    return map(v, function (x) { return isFinite(x) ? x + d : x })
+    return each(v, function (x) { return isFinite(x) ? x + d : x })
   },
   strip: function (k, v, u) {
     var u = u || Q.defaults, d = u[k], n = d && d.length;
     if (d)
-      return map(v, function (x) { return x.substr(-n) == d ? parseFloat(x) : x })
+      return each(v, function (x) { return x.substr(-n) == d ? parseFloat(x) : x })
     return v;
   },
   each: function (ks, o, u) {
-    return map(ks, function (k) { return Q.unify(k, o[k], u) })
+    return each(ks, function (k) { return Q.unify(k, o[k], u) })
+  },
+  map: function (ks, vs, u) {
+    return each(ks, function (k, i) { return Q.unify(k, vs[i], u) })
   },
   rect: function (b, u) {
     return 'rect(' + Q.each(['top', 'right', 'bottom', 'left'], b, u) + ')'
@@ -1497,9 +2196,9 @@ Elem.prototype.update({
     p.insertBefore(n, p.childNodes[util.clip(k < 0 ? C + k : k, 0, C)])
     return this;
   },
-  remove: function () {
+  remove: function (b) {
     var n = this.node, p = n.parentNode;
-    if (p)
+    if (p && dfn(b, true))
       p.removeChild(n)
     return this;
   },
@@ -1511,7 +2210,14 @@ Elem.prototype.update({
     return this.node.ownerDocument ? new Elem(this.node.ownerDocument) : this;
   },
   each: function (sel, fun, acc) {
-    return [].reduce.call(this.node.querySelectorAll(sel), fun, acc) || this;
+    for (var Q = this.node.querySelectorAll(sel), i = 0; i < Q.length; i++)
+      acc = fun(Q[i], acc, i, Q)
+    return acc;
+  },
+  fold: function (fun, acc) {
+    for (var c = this.node.firstElementChild, i = 0; c; c = c.nextSibling)
+      acc = fun(acc, c, i++)
+    return acc;
   },
   nth: function (n) {
     var c = this.node.children, C = c.length;
@@ -1534,8 +2240,24 @@ Elem.prototype.update({
     return this.$(q) || fun(this)
   },
 
-  hide: function (b) { return this.attrs({hidden: b || b == undefined ? '' : null}) },
-  show: function (b) { return this.attrs({hidden: b || b == undefined ? null : ''}) },
+  hide: function (b) { return this.attrs({hidden: dfn(b, true) ? '' : null}) },
+  show: function (b) { return this.attrs({hidden: dfn(b, true) ? null : ''}) },
+  activate: function (b) { return this.instate(b, 'activated') },
+  collapse: function (b) { return this.instate(b, 'collapsed') },
+  validate: function (b) {
+    var n = this.node, v;
+    if (n.checkValidity) {
+      if (v = !n.checkValidity())
+        b = false;
+      this.instate(v, 'invalidated')
+    }
+    return this.fold(function (a, c) { return Sky.elem(c).validate(a) }, dfn(b, true))
+  },
+  instate: function (b, c, d) {
+    var b = dfn(b, true)
+    return this.toggleClass(c, b).fire(c, up({value: b}, d))
+  },
+
   attr: function (name, ns) {
     return this.node.getAttributeNS(ns || null, name)
   },
@@ -1560,6 +2282,9 @@ Elem.prototype.update({
     return this;
   },
 
+  href: function (href) {
+    return this.attrs({href: href})
+  },
   space: function (space) {
     return this.attrs({space: space}, this.xml)
   },
@@ -1587,8 +2312,11 @@ Elem.prototype.update({
   removeClass: function (cls) {
     var node = this.node;
     map(cls, function (c) { node.classList.remove(c) })
-    if (!node.classList.length)
-      node.removeAttribute('class')
+    return this;
+  },
+  toggleClass: function (cls, b) {
+    var node = this.node;
+    map(cls, function (c) { node.classList.toggle(c, b) })
     return this;
   },
   css: function (k) {
@@ -1597,12 +2325,18 @@ Elem.prototype.update({
   },
   addRules: function (rules) {
     var i = 0, sheet = this.node.sheet;
-    for (var selector in rules) {
-      var rule = rules[selector], str = ''
-      for (var property in rule)
-        str += property + ': ' + rule[property] + ';'
-      sheet.insertRule(selector + '{' + str + '}', i++)
+    var rec = function (sel, rule, str) {
+      var str = str || ''
+      for (var property in rule) {
+        if (sel.match(/^@/))
+          str += property + '{' + rec(property, rule[property]) + '}'
+        else
+          str += property + ': ' + rule[property] + ';'
+      }
+      return str;
     }
+    for (var selector in rules)
+      sheet.insertRule(selector + '{' + rec(selector, rules[selector]) + '}', i++)
     return i;
   },
 
@@ -1615,11 +2349,25 @@ Elem.prototype.update({
     })
     return this;
   },
+  apply: function (a) {
+    if (a instanceof Function)
+      return a(this)
+    if (typeof(a) == 'string')
+      return this.txt(a)
+    return this[a[0]].apply(this, a.slice(1))
+  },
   bind: function (name) {
     var fun = this[name]
     return fun.bind.apply(fun, [this].concat([].slice.call(arguments, 1)))
   },
+  map: function (l, f) {
+    return map(f ? map(l, [].concat.bind([f])) : l, this.apply.bind(this))
+  },
 
+  fire: function (type, data, opts) {
+    this.node.dispatchEvent(new CustomEvent(type, up({detail: data}, opts)))
+    return this;
+  },
   on: function (types, fun, capture) {
     var node = this.node;
     types.split(/\s+/).map(function (type) {
@@ -1634,31 +2382,24 @@ Elem.prototype.update({
     })
     return this;
   },
-  trigger: function (type, data, opts) {
-    this.node.dispatchEvent(new CustomEvent(type, up({detail: data}, opts)))
-    return this;
-  },
   upon: function (types, fun, capture) {
-    var f = function (e) { return fun.call(this, e, e.detail) }
-    return this.on(types, f, capture) && f;
+    var self = this, f = function (e) { return fun.call(self, e.detail.value, e) }
+    return this.on(types, f, capture)
   },
-  once: function (types, fun) {
+  once: function (types, fun, capture) {
     var n = 0;
-    return this.til(types, fun, function () { return n++ })
+    return this.til(types, fun, function () { return n++ }, capture)
   },
-  til: function (types, fun, dead) {
+  til: function (types, fun, dead, capture) {
     var self = this;
     self.on(types, function () {
       if (dead())
         self.off(types, arguments.callee)
       else
         fun.apply(this, arguments)
-    })
+    }, capture)
   },
 
-  svg: function (attrs, props) {
-    return svg(up({class: 'svg'}, attrs), props).addTo(this)
-  },
   hl: function (text, level) {
     return this.child('h' + (level || 1)).txt(text)
   },
@@ -1677,14 +2418,21 @@ Elem.prototype.update({
   span: function (attrs, props) {
     return this.child('span', attrs, props)
   },
-  form: function (attrs, props) {
-    return this.child('form', attrs, props)
+
+  svg: function (attrs, props) {
+    return svg(attrs, props).addTo(this)
   },
-  input: function (attrs, props) {
-    return this.child('input', attrs, props)
+  g: function (attrs, props) {
+    return this.div(attrs, props)
   },
-  image: function (x, y, w, h, href, u) {
-    return this.child('img', {class: 'image'}).attrs({src: href}).xywh(x, y, w, h, u)
+  q: function (cls) {
+    return this.unique('.' + cls, function (p) { return p.g({class: cls}) })
+  },
+  icon: function (href, w, h, u) {
+    return this.svg({class: 'icon'}).icon(href).parent().size(w, h, u)
+  },
+  image: function (href, w, h, u) {
+    return this.child('img', {class: 'image'}).attrs({src: href}).size(w, h, u)
   },
   circle: function (cx, cy, r, u) {
     return this.div({class: 'circle'}).xywh(cx - r, cy - r, 2 * r, 2 * r, u).style(Q({borderRadius: r}, u))
@@ -1695,22 +2443,16 @@ Elem.prototype.update({
   rect: function (x, y, w, h, u) {
     return this.div({class: 'rect'}).xywh(x, y, w, h, u)
   },
-  text: function (x, y, text, u) {
-    return this.span({class: 'text'}).xy(x, y, u).txt(text)
-  },
-  g: function (attrs, props) {
-    return this.div(attrs, props)
-  },
-  icon: function (x, y, w, h, href, u) {
-    return this.svgX(Sky.box(x, y, w, h), u).attrs({class: 'icon'}).icon(x, y, w, h, href)
+  text: function (text) {
+    return this.span({class: 'text'}).txt(text)
   },
 
   svgX: function (box, u) {
-    return this.svg({viewBox: box}).resize(box, u)
+    return this.svg({viewBox: box}).embox(box, u)
   },
   iconX: function (box, href, u) {
     with (box || this.bbox())
-      return this.icon(x, y, w, h, href, u)
+      return this.icon(href, w, h, u).place(x, y, u)
   },
   imageX: function (box, href, u) {
     with (box || this.bbox())
@@ -1730,13 +2472,13 @@ Elem.prototype.update({
       return this.rect(x, y, w, h, u)
   },
   textX: function (box, text, ax, ay, u) {
-    return this.text(0, 0, text, u).align(box || this.bbox(), ax, ay)
+    return this.text(text).align(box || this.bbox(), ax, ay, u).anchor(ax, ay)
   },
 
   flex: function (ps, hzn, u) {
-    return ps.reduce(function (r, p) {
+    return (ps || []).reduce(function (r, p) {
       var f, q;
-      if (p == 'fit')
+      if (p == 'fit' || p == null)
         f = '0 0 auto'
       else if ((q = Q.unify('size', p, u)).substr(-1) == '%')
         f = '1 1 ' + q;
@@ -1752,19 +2494,13 @@ Elem.prototype.update({
     return this.g({class: 'col'}).flex(ps, false, u)
   },
 
-  anchor: function (i, j) {
-    var a = i < 0 ? 0 : (i > 0 ? -100 : -50)
-    var b = j < 0 ? 0 : (j > 0 ? -100 : -50)
-    return this.transform({translate: [a + '%', b + '%']})
+  bbox: function (fixed) {
+    var box = new Box(this.node.getBoundingClientRect())
+    return fixed ? box : box.shift(pageXOffset, pageYOffset)
   },
-  bbox: function () {
-    return (new Box(this.node.getBoundingClientRect())).shift(pageXOffset, pageYOffset)
-  },
-  polar: function (r, a) {
-    return [r * trig.cos(a), r * trig.sin(a)]
-  },
-  href: function (href) {
-    return this.attrs({href: href})
+
+  wh: function (w, h, u) {
+    return this.style(Q({width: w, height: h}, u))
   },
   xy: function (x, y, u) {
     return this.style(Q({left: x, top: y, position: 'absolute'}, u))
@@ -1772,18 +2508,35 @@ Elem.prototype.update({
   xywh: function (x, y, w, h, u) {
     return this.style(Q({left: x, top: y, width: w, height: h, position: 'absolute'}, u))
   },
-  put: function (ax, ay, u) {
-    return this.align(Sky.box(0, 0, 100, 100), ax, ay, up({top: '%', left: '%'}, u))
+
+  size: function (w, h, u) {
+    return this.parent().wh.call(this, w, h, u)
   },
+  place: function (x, y, u) {
+    return this.parent().xy.call(this, x, y, u)
+  },
+  cover: function (x, y, w, h, u) {
+    return this.parent().xywh.call(this, x, y, w, h, u)
+  },
+
   align: function (box, ax, ay, u) {
-    return this.place(Sky.box().align(box, ax, ay), u).anchor(ax, ay)
+    with (Sky.box().align(box, ax, ay))
+      return this.place(x, y, u)
   },
-  place: function (box, u) {
-    return this.parent().xy.call(this, box.x, box.y, u)
+  embox: function (box, u) {
+    with (box)
+      return this.cover(x, y, w, h, u)
   },
-  resize: function (box, u) {
-    return this.parent().xywh.call(this, box.x, box.y, box.w, box.h, u)
+
+  anchor: function (i, j) {
+    var a = -((i || 0) + 1) * 50;
+    var b = -((j || 0) + 1) * 50;
+    return this.transform({translate: [a + '%', b + '%']})
   },
+  hang: function (ax, ay, u) {
+    return this.align(Sky.box(0, 0, 100, 100), ax, ay, up({top: '%', left: '%'}, u)).anchor(ax, ay)
+  },
+
   screen: function (x, y) {
     return {x: x, y: y}
   },
@@ -1802,13 +2555,139 @@ Elem.prototype.update({
     return this.style({transform: xform})
   },
   transformation: function (val, u) {
-    var s = this.node.style, val = val || s['transform'] || '';
+    var val = val || this.node.style.transform || '';
     var m, p = /(\w+)\(([^\)]*)\)/g, tx = {}
     while (m = p.exec(val)) {
       var k = m[1], v = m[2].split(',')
       tx[k] = Q.strip(k, v, u)
     }
     return tx;
+  },
+
+  load: function (json) {
+    var n = this.node, t = n.type, json = n.name ? json[n.name] : json;
+    if (json !== undefined) {
+      if (t == 'button' || t == 'reset' || t == 'submit')
+        return this;
+      else if (t == 'select-one' || t == 'select-multiple')
+        this.each('option', function (o) {
+          if ([].some.call([].concat(json), function (v) { return v == o.value }))
+            o.selected = true;
+        })
+      else if (t == 'fieldset')
+        this.each('input', function (i) {
+          if ([].some.call([].concat(json), function (v) { return v == i.value }))
+            i.checked = true;
+        })
+      else if (t == 'checkbox' || t == 'radio')
+        n.checked = isFinite(json) ? json : json == n.value;
+      else if (n.value !== undefined)
+        n.value = json || ''
+      else if (n.childElementCount)
+        this.fold(function (_, c) {
+          Sky.elem(c).load(c.name ? json[c.name] : json)
+        })
+    }
+    return this;
+  },
+
+  dump: function (json) {
+    var json = json || {}
+    var n = this.node, t = n.type, p;
+    if (t == 'button' || t == 'reset' || t == 'submit')
+      return json;
+    else if (t == 'select-one')
+      p = this.each('option', function (o, v) {
+        return (o.selected) ? o.value : v;
+      }, null)
+    else if (t == 'select-multiple')
+      p = this.each('option', function (o, l) {
+        return (o.selected && l.push(o.value)), l;
+      }, [])
+    else if (t == 'fieldset' && n.querySelector('[type="radio"]'))
+      p = this.each('input', function (i, v) {
+        return (i.checked) ? i.value : v;
+      }, null)
+    else if (t == 'fieldset')
+      p = this.each('input', function (i, l) {
+        return (i.checked && l.push(i.value)), l;
+      }, [])
+    else if (t == 'checkbox' || t == 'radio')
+      p = n.checked;
+    else if (t == 'number' || t == 'range')
+      p = dfn(n.valueAsNumber, null)
+    else
+      p = n.value;
+    if (p !== undefined)
+      return n.name ? ((json[n.name] = p), json) : p;
+    if (n.childElementCount)
+      return this.fold(function (o, c) {
+        return Sky.elem(c).dump(o)
+      }, n.name ? pre(json, n.name, {}) : json)
+    return json;
+  },
+
+  form: function (attrs, props) {
+    return this.child('form', attrs, props)
+  },
+  label: function (text) {
+    return this.child('label').txt(text)
+  },
+  button: function (desc, props) {
+    var desc = up({}, desc)
+    var icon = pop(desc, 'icon')
+    var label = pop(desc, 'label', '')
+    var action = pop(desc, 'action', function () {})
+    var elem = this.child('button', desc, props)
+    if (icon)
+      elem.icon.apply(elem, [].concat(icon))
+    else if (label)
+      elem.txt(label)
+    return elem.on('click', action.bind(elem))
+  },
+  input: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var elem = label ? this.label(label) : this;
+    return elem.child('input', desc, props)
+  },
+  output: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var elem = label ? this.label(label) : this;
+    return elem.child('output', desc, props)
+  },
+  fieldset: function (desc) {
+    var desc = up({}, desc)
+    var options = pop(desc, 'options', [])
+    return options.reduce(function (s, d) {
+      var d = [].concat(d)
+      return s.input(up(desc, {value: d[0], label: d[1] || d[0]})), s;
+    }, this.child('fieldset', {name: desc.name}))
+  },
+  option: function (value, text) {
+    return this.child('option', {value: value}).txt(text || value)
+  },
+  options: function (desc) {
+    if (desc instanceof Array)
+      this.map(desc, 'option')
+    else if (desc instanceof Object)
+      for (var k in desc)
+        this.child('optgroup', {label: k}).map(desc[k], 'option')
+    return this;
+  },
+  select: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var options = pop(desc, 'options')
+    var elem = label ? this.label(label) : this;
+    return elem.child('select', desc, props).options(options)
+  },
+  textarea: function (desc, props) {
+    var desc = up({}, desc)
+    var label = pop(desc, 'label')
+    var elem = label ? this.label(label) : this;
+    return elem.child('textarea', desc, props)
   }
 })
 
@@ -1844,8 +2723,8 @@ SVGElem.prototype = new Elem().update({
   rect: function (x, y, w, h) {
     return this.child('rect', {x: x, y: y, width: w, height: h})
   },
-  text: function (x, y, text) {
-    return this.child('text', {x: x, y: y}, {textContent: text})
+  text: function (text) {
+    return this.child('text', {}, {textContent: text})
   },
   tspan: function (text) {
     return this.child('tspan', {}, {textContent: text})
@@ -1853,8 +2732,11 @@ SVGElem.prototype = new Elem().update({
   g: function (attrs, props) {
     return this.child('g', attrs, props)
   },
-  image: function (x, y, w, h, href) {
-    return this.child('image').href(href).xywh(x, y, w, h)
+  icon: function (href, w, h) {
+    return this.use(href).wh(w, h)
+  },
+  image: function (href, w, h) {
+    return this.child('image').href(href).wh(w, h)
   },
   use: function (href) {
     return this.child('use').href(href)
@@ -1865,8 +2747,8 @@ SVGElem.prototype = new Elem().update({
   clipPath: function (attrs, props) {
     return this.child('clipPath', attrs, props)
   },
-  icon: function (x, y, w, h, href) {
-    return this.use(href).xywh(x, y, w, h)
+  symbol: function (attrs, props) {
+    return this.child('symbol', attrs, props)
   },
 
   border: function (t, r, b, l, box) {
@@ -1889,6 +2771,9 @@ SVGElem.prototype = new Elem().update({
   },
   href: function (href) {
     return this.attrs({href: href}, this.xlink)
+  },
+  wh: function (w, h) {
+    return this.attrs({width: w, height: h})
   },
   xy: function (x, y) {
     return this.attrs({x: x, y: y})
@@ -1948,7 +2833,7 @@ var Sky = module.exports = {
   SVGElem: SVGElem
 }
 
-},{"./env":1}],8:[function(require,module,exports){
+},{"./env":1}],9:[function(require,module,exports){
 var up = function (a, b) {
   for (var k in b)
     a[k] = b[k]
@@ -1980,7 +2865,7 @@ var nil = function (x) {
   if (typeof(x) == 'string')
     return ''
   if (typeof(x) == 'number')
-    return 0
+    return 0;
 }
 var pad = function (s, opt) {
   var s = s + '', w = opt && opt.width || 2, p = opt && opt.pad || '0';
@@ -2021,6 +2906,10 @@ var equals = function (a, b) {
     return true;
   }
   return false;
+}
+
+var match = function (a, b) {
+  return (b instanceof Function) ? b(a) : equals(a, b)
 }
 
 var key = function (i, k) {
@@ -2065,12 +2954,14 @@ var first = function (o, f) {
 
 var fold = function (f, a, o) {
   if (o instanceof Array)
-    for (var k in o)
-      a = f(a, o[k], k, o)
-  else
-    for (var k in o)
-      a = f(a, [k, o[k]], k, o)
+    return o.reduce(f, a)
+  for (var ks = Object.keys(def(o, {})), i = 0, k = ks[i]; i < ks.length; k = ks[++i])
+    a = f(a, [k, o[k]], k, o)
   return a;
+}
+
+var map = function (o, f) {
+  return fold(function (a, i, k) { return a.push(f(i, k, o)), a }, [], o)
 }
 
 var all = function (o, f) {
@@ -2134,12 +3025,14 @@ var Sun = module.exports = {
   nchoosek: nchoosek,
   bezier: bezier,
   equals: equals,
+  match: match,
   key: key,
   val: val,
   keyEquate: keyEquate,
   find: find,
   first: first,
   fold: fold,
+  map: map,
   all: all,
   any: any,
   get: get,
@@ -2170,30 +3063,45 @@ var Sun = module.exports = {
   },
 
   lookup: function (obj, path) {
-    var path = L(path)
     if (path.length == 1)
       return get(def(obj, {}), path[0])
     if (path.length)
       return Sun.lookup(get(def(obj, {}), path[0]), path.slice(1))
+    return obj;
   },
 
   modify: function (obj, path, val, empty) {
-    var path = L(path), empty = def(nil(empty), {})
+    var empty = def(nil(empty), {})
     var fun = (val instanceof Function) ? val : function () { return val }
     var obj = def(obj, empty)
     if (path.length == 1)
       return set(obj, path[0], fun(get(obj, path[0])))
     if (path.length)
       return set(obj, path[0], Sun.modify(get(obj, path[0]), path.slice(1), fun, empty))
-    return obj;
+    return val;
   },
 
   remove: function (obj, path) {
-    var path = L(path)
     if (path.length == 1)
-      del(def(obj, {}), path[0])
+      return del(def(obj, {}), path[0])
     else if (path.length)
-      Sun.remove(get(obj, path[0]), path.slice(1))
+      return set(obj, path[0], Sun.remove(get(obj, path[0]), path.slice(1)))
+    return nil(obj)
+  },
+
+  accrue: function (obj, path, change, op) {
+    var op = def(op, Sun.op)
+    return Sun.modify(obj, path, function (v) { return op(v, change) })
+  },
+
+  create: function (obj, path, initial) {
+    return Sun.swap(obj, path, initial, function (v) { return v === undefined })
+  },
+
+  swap: function (obj, path, swap, cmp) {
+    var val = Sun.lookup(obj, path)
+    if (match(val, def(cmp, function (v) { return v !== undefined })))
+      return Sun.modify(obj, path, swap)
     return obj;
   },
 
@@ -2201,8 +3109,14 @@ var Sun = module.exports = {
     return fold(function (a, i) { return (a[i[0]] = i[1]), a }, {}, iter)
   },
 
-  update: function (a, b) {
-    return fold(function (a, i) { return set(a, key(i), val(i)) }, a, b)
+  insert: function (obj, item) {
+    if (!(obj instanceof Array) || (item instanceof Array))
+      return set(obj, key(item), val(item))
+    return L.insert(obj, item)
+  },
+
+  update: function (obj, iter) {
+    return fold(Sun.insert, obj, iter)
   },
 
   except: function (obj, iter) {
@@ -2212,7 +3126,7 @@ var Sun = module.exports = {
   filter: function (obj, fun) {
     return fold(function (a, i) {
       if (fun(i))
-        set(a, key(i), val(i))
+        Sun.insert(a, i)
       return a;
     }, nil(obj), obj)
   },
@@ -2243,31 +3157,61 @@ var Sun = module.exports = {
   }
 }
 
-var derive = function (cons, args) {
-  var copy = function () { return cons.apply(this, arguments) }
-  return extend(cls(copy), cat(cons.prototype, args))
-}
-var extend = function (cons, args) {
-  return [].reduce.call(args, up, cons.prototype), cons;
-}
-
-var cls = Sun.cls = up(function (cons) {
-  return up(extend(cons, [].slice.call(arguments, 1)), cls)
+var O = Sun.op = up(function (value, change) {
+  return O[change[0]](value, change[1])
 }, {
-  derive: function () { return derive(this, [].slice.call(arguments)) },
-  extend: function () { return extend(this, [].slice.call(arguments)) },
-  subcls: function (cons) {
-    return extend(cons, cat(this.prototype, [].slice.call(arguments, 1)))
+  '+': function (v, d) {
+    var v = def(v, nil(d))
+    return (d instanceof Object) ? Sun.update(v, d) : v + d;
+  },
+  '-': function (v, d) {
+    var v = def(v, nil(d))
+    return (d instanceof Object) ? Sun.except(v, d) : v - d;
+  },
+  '=': function (v, d) {
+    return d;
   }
 })
 
-Sun.Cage = function Cage(obj, opt) {
+// derive: copy the constructor with an extended prototype
+// extend: change the constructor prototype in-place
+// subcls: rebase the constructor prototype on another
+// type: create a subcls with a functional constructor
+
+var derive = function (cons, over) {
+  var copy = function () { return cons.apply(this, arguments) }
+  return extend(cls(up(copy, {prototype: ext(cons.prototype)})), over)
+}
+var extend = function (cons, over) {
+  return cat([], over).reduce(up, cons.prototype), cons;
+}
+
+var cls = Sun.cls = up(function (cons, over) {
+  return up(extend(cons, over), cls)
+}, {
+  derive: function (over) { return derive(this, over) },
+  extend: function (over) { return extend(this, over) },
+  subcls: function (cons, over) {
+    return up(up(cons, {prototype: up(ext(this.prototype, cons.prototype), over)}), this)
+  },
+  type: function (cons, over) {
+    var sub = this.subcls(cons, over)
+    var fun = function (a, r, g, s) { return new sub(this, a, r, g, s) }
+    return up(fun, {prototype: sub.prototype})
+  }
+})
+
+Sun.Cage = cls(function Cage(obj, opt) {
   this.__opt__ = up({sep: /\s+/}, opt)
   this.__obj__ = obj || this;
   this.__fns__ = {}
   return this;
-}
-up(Sun.Cage.prototype, {
+}, {
+  fire: function (k, v, o) {
+    var self = this, funs = self.__fns__[k] || []
+    funs.map(function (f) { f.call(self, v, o, k) })
+    return this;
+  },
   get: function (k, d) {
     if (k in this.__obj__)
       return this.__obj__[k]
@@ -2277,7 +3221,7 @@ up(Sun.Cage.prototype, {
   change: function (k, v) {
     var u = this.__obj__[k]
     this.__obj__[k] = v;
-    this.trigger(k, v, u)
+    this.fire(k, v, u)
     return v;
   },
   update: function (obj) {
@@ -2286,31 +3230,29 @@ up(Sun.Cage.prototype, {
     return this;
   },
 
-  on: function (keys, fun) {
-    var fns = this.__fns__, sep = this.__opt__.sep;
-    keys.split(sep).map(function (k) { L.keep(fns[k] = fns[k] || [], fun) })
+  on: function (keys, fun, now) {
+    var fns = this.__fns__, keys = keys.split(this.__opt__.sep), self = this;
+    keys.map(function (k) { L.keep(fns[k] = fns[k] || [], fun) })
+    if (now)
+      keys.map(function (k) { var v = self[k]; fun.call(self, v, v, k) })
     return this;
   },
   off: function (keys, fun) {
-    var fns = this.__fns__, sep = this.__opt__.sep;
-    keys.split(sep).map(function (k) { L.drop(fns[k] || [], fun) })
+    var fns = this.__fns__, keys = keys.split(this.__opt__.sep)
+    keys.map(function (k) { L.drop(fns[k] || [], fun) })
     return this;
   },
-  once: function (keys, fun) {
+  once: function (keys, fun, now) {
     var n = 0;
-    return this.til(keys, fun, function () { return n++ })
+    return this.til(keys, fun, function () { return n++ }, now)
   },
-  til: function (keys, fun, dead) {
+  til: function (keys, fun, dead, now) {
     this.on(keys, function () {
       if (dead())
         this.off(keys, arguments.callee)
       else
         fun.apply(this, arguments)
-    })
-  },
-  trigger: function (key, val, old) {
-    var self = this;
-    return (self.__fns__[key] || []).map(function (f) { f.call(self, val, old, key) })
+    }, now)
   },
   toggle: function (key) {
     return this.change(key, !this[key])
@@ -2372,7 +3314,7 @@ var L = Sun.list = up(function (x) {
   return x instanceof Array ? x : [x]
 }, {
   last: function (list, n) { return list[list.length - (n || 1)] },
-  append: function (list, item) { return list.push(item) && list },
+  append: function (list, item) { return list.push(item), list },
   concat: function (item, list) { return [item].concat([].slice.call(list)) },
   drop: function (list, item) {
     var i = list.indexOf(item)
@@ -2397,12 +3339,12 @@ var L = Sun.list = up(function (x) {
       list.push(item)
     return list;
   },
-  insert: function (list, item, lte) {
-    var lte = lte || Sun.lte;
+  insert: function (list, item, eq) {
+    var eq = eq || Sun.equals;
     for (var i = 0; i < list.length; i++)
-      if (lte(item, list[i]))
-        return list.splice(i, 0, item) && list;
-    return list.push(item) && list;
+      if (eq(item, list[i]))
+        return list;
+    return L.append(list, item)
   },
   umerge: function (x, y, lt) {
     var lt = lt || Sun.lt;
@@ -2420,6 +3362,12 @@ var L = Sun.list = up(function (x) {
       }
     }
     return z;
+  },
+  repeat: function (list, n) {
+    var l = []
+    for (var i = 0; i < n; i++)
+      l = l.concat(list)
+    return l;
   },
 
   cmp: function (x, y) {

@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Popover</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      *[hidden] {
+        display: none;
+      }
+
+      .popup {
+        display: block;
+        position: relative;
+        top: calc(50% - 1ex);
+        left: calc(100% + 1em);
+        height: 3em;
+        width: 3em;
+        background: teal;
+        border: 1px solid #333;
+        border-radius: 3px;
+      }
+
+      .popup::before, .popup::after {
+        content: '';
+        display: block;
+        position: absolute;
+        top: calc(50% - 12px);
+        left: calc(0% - 12px);
+        width: 0;
+        height: 0;
+        border-width: 12px 12px 12px 0px;
+        border-style: solid;
+        border-color: transparent #333 transparent transparent;
+      }
+
+      .popup::after {
+        top: calc(50% - 10px);
+        left: calc(0% - 10px);
+        border-width: 10px 10px 10px 0px;
+        border-color: transparent teal transparent transparent;
+      }
+    </style>
+    <script src="all"></script>
+    <script>
+     window.onload = function () {
+       var P = Sky.path;
+       var up = Sun.up;
+       Sky.Elem.prototype.update({
+         popover: Orb.type(function Popover(root, opts) {
+           var opts = up({}, opts)
+           var elem = this.elem = root.g({class: 'popover'})
+           elem.embox(opts.dims).style({background: 'blue', position: 'fixed'})
+         })
+       })
+
+       var body = Sky.$(document.body)
+       var dims = Sky.box(0, 0, window.innerWidth, window.innerHeight)
+       var mdim = dims.scale(0.5)
+       var tdim = Sky.box(0, 0, 55, 10).align(mdim, -0.96, -0.9)
+       var cdim = Sky.box(0, 0, 10, 20).align(tdim, +1.5)
+       var back = body.rectX(mdim).style({background: 'black', borderRadius: '8px'})
+       var text = body.textX(tdim, 'Hello').style({color: 'green', 'font-family': 'Menlo', cursor: 'pointer'})
+       var curs = body.rectX(cdim).style({background: 'green'})
+       text.on('click', function () {
+         body.popover({dims: dims})
+       })
+
+       var z = body.g().style({
+         display: 'block',
+         height: '10em',
+         width: '10em',
+         background: 'red'
+       })
+       var y = z.g({class: 'popup'}).align(z.bbox(), 1, 0).anchor(-1.5)
+       var x = y.svg({viewBox: [-4, -10, 20, 20]})
+           .style({
+             position: 'absolute',
+             top: 'calc(50% - 1ex)',
+             right: '-1em',
+             height: '1em',
+             width: '1em',
+             fill: 'teal',
+             stroke: '#333',
+             strokeWidth: 2
+           }).path(P.triangle(0, 0, 20, 10)).transform({rotate: -90})
+
+       var w = z.g().align(z.bbox().shift(0, 12), 0, 1).anchor(0, -1).wh(100, 100)
+           .style({
+             background: 'pink'
+           })
+     }
+    </script>
+  </head>
+  <body></body>
+</html>

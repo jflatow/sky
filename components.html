@@ -1,0 +1,576 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Components</title>
+    <style>
+      body {
+        margin: 1em auto;
+        max-width: 540px;
+        color: #333;
+        font-family: Source Sans Pro;
+      }
+
+      body > .stack + .stack {
+        margin-top: 2em;
+      }
+
+      .panel {
+        border-radius: 1ex;
+        overflow: hidden;
+      }
+
+      .panel .barbell .foot {
+        padding: 1ex 1em;
+      }
+
+      .panel.danger .title-bar {
+        background-color: rgb(218, 51, 49);
+        color: #fff;
+      }
+
+      @keyframes deflate {
+        0%   {padding: 0.5ex 0}
+        100% {padding: 0}
+      }
+
+      .list-editor-item.collapsed {
+        animation: deflate 0.5s;
+      }
+
+      .list-editor-item.collapsed select {
+        border: 1px solid #ccc;
+      }
+
+      .field .control fieldset {
+        border: none;
+      }
+
+      .field .control input:not([type="checkbox"]):not([type="radio"]), .field .control select {
+         min-width: 16em;
+       }
+
+      .field .control textarea {
+        width: 100%;
+        min-height: 5em;
+      }
+
+      button {
+        width: 100%;
+        padding: 1em;
+        background: none;
+        border-radius: 1ex;
+        border: 1px solid rgb(223, 223, 223);
+        color: rgb(99, 181, 228);
+        font-weight: 600;
+        transition: all 0.3s;
+      }
+
+      button:hover {
+        border: 1px solid rgb(180, 180, 180);
+        transition: all 0.3s;
+      }
+
+      button.add, button.remove {
+        padding: 0 1ex;
+        border: 0;
+      }
+
+      button.add {
+        fill: rgb(254, 203, 46);
+      }
+
+      button.remove {
+        fill: rgb(218, 51, 49);
+      }
+
+      .danger button {
+        color: rgb(218, 51, 49);
+      }
+
+      .menu {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 180px;
+        margin: 0 !important;
+      }
+
+      .menu button {
+        border: 0;
+        text-align: left;
+      }
+
+      .menu button:focus {
+        outline: none;
+      }
+
+      .menu .menu-item {
+        transition: all 0.3s;
+      }
+
+      .menu .menu-item.activated {
+        background-color: #efefef;
+        border-radius: 1ex;
+        transition: all 0.3s;
+      }
+
+      .menu > .barbell button {
+        color: black;
+      }
+
+      .menu .stack:not(:first-child) {
+        margin-left: 1ex;
+      }
+
+      .popup {
+        border-radius: 1ex;
+      }
+
+      .popup button {
+        width: calc(100% - 4em);
+        padding: 1ex;
+        margin: 0 2em 1ex;
+        border-radius: 1ex;
+        border: 1px solid rgb(223, 223, 223);
+        color: rgb(99, 181, 228);
+        font-weight: 600;
+        text-align: center;
+        transition: all 0.3s;
+      }
+
+      .popup button:hover {
+        border: 1px solid rgb(180, 180, 180);
+        transition: all 0.3s;
+      }
+    </style>
+    <script src="all"></script>
+    <script>
+     window.onload = function () {
+       var U = Sky.util, dfn = U.dfn, up = Sun.up;
+
+       Sky.Elem.prototype.update({
+         fade: function (b, f, r) {
+           var b = dfn(b, true), r = r || 1.5;
+           return this.animate(function (n, i) {
+             var o = Math.max(getComputedStyle(n).opacity, .005)
+             if (b) {
+               if (o > 0.01 && i < 100)
+                 return n.style.opacity = o / r;
+               f && f(b)
+             } else {
+               if (i == 0)
+                 f && f(b)
+               if (o < 0.99 && i < 100)
+                 return n.style.opacity = o * r;
+             }
+           })
+         }
+       })
+
+       Orb.extend({
+         fadeHide: function (b) {
+           this.elem.fade(b, this.elem.bind('hide'))
+         }
+       })
+
+       Site = Std.derive({
+         Window: Std.Window.derive({
+           domainMenu: Std.Widget.type(function DomainMenu(win, opts) {
+             this.base = win.elem.pillar()
+             this.setOpts(opts || {}, true)
+           }, {
+             setOpts: function (o, f) {
+               var opts = this.stdOpts(o, f, 'menu', {path: ['domains']})
+               if (f || o.domains) {
+                 this.base.setOpts({
+                   head: ['barbell', {
+                     body: ['button', {label: 'Domains'}],
+                     foot: ['addButton', {action: this.bind('createDomain')}]
+                   }]
+                 })
+                 this.load({domains: opts.domains})
+               }
+             },
+
+             createDomain: function () {
+               var self = this;
+               var popup = this.elem.popup({
+                 ax: 1, ay: -1, by: -1, dy: 10,
+                 fixed: true,
+                 body: ['stack', {
+                   items: [
+                     ['field', {
+                       path: ['id'],
+                       classes: ['inline'],
+                       epithet: 'ID',
+                       control: ['input', {required: true}]
+                     }],
+                     ['button', {
+                       label: 'Create domain',
+                       action: function () {
+                         if (popup.validate()) {
+                           var data = popup.dump()
+                           self.obtainItemFor([data.id, {settings: {label: data.id}}])
+                           self.selectPath(['domains', data.id])
+                           popup.activate(false)
+                         }
+                       }
+                     }]
+                   ]
+                 }]
+               })
+             },
+
+             createPlug: function (id) {
+               var self = this;
+               var popup = this.elem.popup({
+                 ax: 1,
+                 abox: this.elem.bbox(true),
+                 fixed: true,
+                 body: ['stack', {
+                   items: [
+                     ['field', {
+                       path: ['type'],
+                       classes: ['inline'],
+                       epithet: 'Type',
+                       control: ['select', {
+                         options: [
+                           ['p-google-spreadsheet', 'Google Spreadsheet']
+                         ]
+                       }]
+                     }],
+                     ['field', {
+                       path: ['name'],
+                       classes: ['inline'],
+                       epithet: 'Name',
+                       control: ['input', {required: true}]
+                     }],
+                     ['button', {
+                       label: 'OK',
+                       action: function () {
+                         if (popup.validate()) {
+                           var data = popup.dump(), p = [data.type, data.name]
+                           self.lookupPath(['domains', id, 'plugs']).obtainItemFor(p)
+                           self.selectPath(['domains', id, 'plugs', p])
+                           popup.activate(false)
+                         }
+                       }
+                     }]
+                   ]
+                 }]
+               })
+             },
+
+             item: function (id, datum) {
+               var menu = this, domain = Sun.val(datum)
+               return ['pillar', {
+                 classes: ['menu-item'],
+                 mutex: true,
+                 head: ['barbell', {
+                   body: ['button', {
+                     label: domain.settings.label,
+                     action: menu.bind('selectPath', ['domains', id])
+                   }]
+                 }],
+                 upon: {
+                   activated: function (b) {
+                     b && console.log("nav.go({tag: 'domain'})", id)
+                   }
+                 },
+                 body: ['stack', {
+                   items: [
+                     ['pillar', {
+                       classes: ['menu-item'],
+                       path: ['plugs'],
+                       head: ['barbell', {
+                         body: ['button', {label: 'Plugs'}],
+                         foot: ['addButton', {action: menu.bind('createPlug', id)}]
+                       }],
+                       peel: function (json) { return [json] },
+                       wrap: function (json) { return json[0] },
+                       item: function (p) {
+                         var prefix = ['domains', id, 'plugs']
+                         return ['barbell', {
+                           classes: ['menu-item'],
+                           body: ['button', {label: p[1], action: menu.bind('selectPath', prefix.concat([p]))}],
+                           upon: {
+                             activated: function (b) {
+                               b && console.log("lookup plug and go", prefix, p)
+                             }
+                           }
+                         }]
+                       }
+                     }],
+                     ['pillar', {
+                       classes: ['menu-item'],
+                       path: ['users'],
+                       head: ['barbell', {
+                         body: ['button', {label: 'Users', action: this.bind('selectPath', ['domains', id, 'users'])}],
+                       }],
+                       upon: {
+                         activated: function (b) {
+                           b && console.log("nav.go({tag: 'users'})", id)
+                         }
+                       }
+                     }]
+                   ]
+                 }]
+               }]
+             }
+           })
+         })
+       })
+
+       nav = Site.nav({
+         home: {
+           draw: function (win) {
+             Settings = win.elem.stack({
+               items: [
+                 ['panel', {
+                   title: 'General',
+                   items: [
+                     ['field', {
+                       path: ['domain_label'],
+                       epithet: 'Domain label'
+                     }]
+                   ]
+                 }],
+
+                 ['panel', {
+                   path: ['email'],
+                   title: 'Email provider',
+                   items: [
+                     ['field', {
+                       path: ['module'],
+                       epithet: 'Provider',
+                       control: ['select', {
+                         options: {
+                           'Implemented': [
+                             ['mandrill', 'Mandrill']
+                           ],
+                           'Not yet implemented': [
+                             ['mailgun', 'MailGun'],
+                             ['sendgrid', 'SendGrid']
+                           ]
+                         }
+                       }]
+                     }],
+                     ['field', {
+                       path: ['api_key'],
+                       epithet: 'API key',
+                       control: ['input', {required: true}]
+                     }]
+                   ]
+                 }],
+
+                 ['panel', {
+                   title: 'Authentication preferences',
+                   items: [
+                     ['field', {
+                       path: ['eauth', 'allowed_redirects'],
+                       epithet: 'Allowed redirect URIs',
+                       advice: 'After authentication, users will only be sent to URIs in the following list:',
+                       control: ['tokenListEditor']
+                     }],
+                     ['field', {
+                       path: ['eauth', 'check_address_uri'],
+                       epithet: 'Check address URI',
+                       advice: 'When an address verification is sent, users will be redirected to the following URI:'
+                     }]
+                   ]
+                 }],
+
+                 ['listEditor', {
+                   path: ['eauth', 'providers'],
+                   title: 'Authentication providers',
+                   peel: function (json) { return json[1] },
+                   wrap: function (json) { return [json.provider, json] },
+                   item: ['stack', {
+                     items: [
+                       ['field', {
+                         path: ['provider'],
+                         classes: ['inline'],
+                         epithet: 'Provider',
+                         control: ['select', {
+                           options: [
+                             ['facebook', 'Facebook'],
+                             ['google', 'Google']
+                           ]
+                         }]
+                       }],
+                       ['field', {
+                         path: ['client_id'],
+                         classes: ['inline'],
+                         epithet: 'Client id'
+                       }],
+                       ['field', {
+                         path: ['client_secret'],
+                         classes: ['inline'],
+                         epithet: 'Client secret'
+                       }],
+                       ['field', {
+                         path: ['may_register'],
+                         classes: ['inline'],
+                         epithet: 'Allow users to register',
+                         advice: ['Should users be able to sign up for the first time using this provider?',
+                                  'If not, users must register in some other way.'].join('\n'),
+                         control: ['input', {type: 'checkbox'}]
+                       }]
+                     ]
+                   }]
+                 }],
+
+                 ['button', {
+                   label: 'Save settings',
+                   action: function () { Settings.validate() }
+                 }]
+               ]
+             })
+
+             Danger = win.elem.stack({
+               items: [
+                 ['panel', {
+                   classes: ['danger'],
+                   title: 'Danger zone',
+                   items: [
+                     ['field', {
+                       classes: ['inline'],
+                       epithet: 'Delete this domain',
+                       advice: ['Once you delete a domain, there is no going back.',
+                                'Please be certain.'].join('\n'),
+                       control: ['button', {
+                         label: 'Delete this domain',
+                         action: function () { console.log('deleted') }
+                       }]
+                     }]
+                   ]
+                 }]
+               ]
+             })
+
+             Settings.elem.popup({
+               ax: -1, ay: -1, by: -1, dy: 0,
+               dismiss: 'fadeHide',
+               body: ['stack', {
+                 items: [
+                   ['input']
+                 ]
+               }]
+             })
+             Settings.elem.on('list-change', function (e) {
+               console.log(e.detail)
+             })
+             Settings.load({
+               domain_label: 'LogBaseD',
+               email: {module: 'sendgrid'},
+               eauth: {
+                 allowed_redirects: ['https://app.logbased.io/some/redirect']
+               }
+             })
+             console.log(Settings.dump())
+
+             Info = win.elem.stack({
+               items: [
+                 ['panel', {
+                   title: 'Info',
+                   items: [
+                     ['field', {epithet: 'First name', control: ['input', {name: 'first_name'}]}],
+                     ['field', {epithet: 'Last name', control: ['input', {name: 'last_name'}]}],
+                     ['field', {
+                       epithet: 'Email address',
+                       control: ['input', {
+                         name: 'email',
+                         type: 'email',
+                         required: true
+                       }]
+                     }],
+                     ['field', {
+                       epithet: 'Age',
+                       control: ['input', {
+                         name: 'age',
+                         type: 'number'
+                       }]
+                     }],
+                     ['field', {
+                       control: ['input', {
+                         name: 'age',
+                         type: 'range'
+                       }]
+                     }],
+                     ['field', {
+                       epithet: 'Gender',
+                       control: ['select', {
+                         name: 'gender',
+                         multiple: true,
+                         options: [
+                           ['male', 'Male'],
+                           ['female', 'Female']
+                         ]
+                       }]
+                     }],
+                     ['field', {
+                       epithet: 'Location',
+                       control: ['fieldset', {
+                         name: 'location',
+                         type: 'radio',
+                         options: ['Palo Alto', 'New York']
+                       }]
+                     }],
+                     ['field', {
+                       epithet: 'Languages',
+                       control: ['fieldset', {
+                         name: 'languages',
+                         type: 'checkbox',
+                         options: ['English', 'Chinese']
+                       }]
+                     }],
+                     ['field', {
+                       epithet: 'Notes',
+                       control: ['textarea', {
+                         name: 'notes',
+                         placeholder: 'Take some notes...'
+                       }]
+                     }]
+                   ]
+                 }]
+               ]
+             })
+
+             Info.load({
+               first_name: 'Jared',
+               last_name: 'Flatow',
+               email: 'jared@logbased.com',
+               age: 30,
+               gender: 'male',
+               location: 'Palo Alto',
+               languages: ['English', 'Chinese']
+             })
+             console.log(Info.dump())
+
+             Menu = win.domainMenu({
+               domains: {
+                 logd: {
+                   settings: {label: 'LogBaseD'},
+                   plugs: [
+                     ['p-google-spreadsheet', 'customers'],
+                     ['p-google-spreadsheet', 'assets']
+                   ]
+                 },
+                 skej: {
+                   settings: {label: 'Skej'},
+                   plugs: [
+                     ['p-google-spreadsheet', 'venues']
+                   ]
+                 }
+               }
+             })
+             Menu.selectPath(['domains', 'logd'])
+           }
+         }
+       })
+       nav.launch({tag: 'home'})
+     }
+    </script>
+  </head>
+  <body></body>
+</html>
