@@ -99,7 +99,8 @@ var Nav = Cage.subcls(function Nav(pkg, pages, frame, opts) {
   // -> to STATE
 
   load: function (state, opts) {
-    return this.draw(state.tag, this.frame.window(state, opts))
+    var tag = this.change('pageType', state.tag)
+    return this.draw(tag, this.frame.window(state, opts))
   },
 
   reload: function (state, data) {

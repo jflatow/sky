@@ -19,10 +19,6 @@
         overflow: hidden;
       }
 
-      .panel .barbell .foot {
-        padding: 1ex 1em;
-      }
-
       .panel.danger .title-bar {
         background-color: rgb(218, 51, 49);
         color: #fff;
@@ -56,35 +52,8 @@
 
       button {
         width: 100%;
-        padding: 1em;
-        background: none;
         border-radius: 1ex;
-        border: 1px solid rgb(223, 223, 223);
-        color: rgb(99, 181, 228);
-        font-weight: 600;
-        transition: all 0.3s;
-      }
-
-      button:hover {
-        border: 1px solid rgb(180, 180, 180);
-        transition: all 0.3s;
-      }
-
-      button.add, button.remove {
-        padding: 0 1ex;
-        border: 0;
-      }
-
-      button.add {
-        fill: rgb(254, 203, 46);
-      }
-
-      button.remove {
-        fill: rgb(218, 51, 49);
-      }
-
-      .danger button {
-        color: rgb(218, 51, 49);
+        outline: none;
       }
 
       .menu {
@@ -147,31 +116,6 @@
     <script>
      window.onload = function () {
        var U = Sky.util, dfn = U.dfn, up = Sun.up;
-
-       Sky.Elem.prototype.update({
-         fade: function (b, f, r) {
-           var b = dfn(b, true), r = r || 1.5;
-           return this.animate(function (n, i) {
-             var o = Math.max(getComputedStyle(n).opacity, .005)
-             if (b) {
-               if (o > 0.01 && i < 100)
-                 return n.style.opacity = o / r;
-               f && f(b)
-             } else {
-               if (i == 0)
-                 f && f(b)
-               if (o < 0.99 && i < 100)
-                 return n.style.opacity = o * r;
-             }
-           })
-         }
-       })
-
-       Orb.extend({
-         fadeHide: function (b) {
-           this.elem.fade(b, this.elem.bind('hide'))
-         }
-       })
 
        Site = Std.derive({
          Window: Std.Window.derive({
@@ -449,8 +393,11 @@
              })
 
              Settings.elem.popup({
-               ax: -1, ay: -1, by: -1, dy: 0,
-               dismiss: 'fadeHide',
+               fixed: true,
+               ax: -1, ay: -1,
+               bx: +1, by: -1,
+               dx: 0, dy: 0,
+               dismiss: 'hide',
                body: ['stack', {
                  items: [
                    ['input']

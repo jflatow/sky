@@ -172,6 +172,13 @@ test('swap', function (t) {
   t.end()
 })
 
+test('either', function (t) {
+  var o = {a: {b: 'c'}}
+  t.deepEqual(Sun.either([[o, ['a']]]), {b: 'c'})
+  t.deepEqual(Sun.either([[o, ['b']], [o, ['a', 'b']]]), 'c')
+  t.end()
+})
+
 test('object', function (t) {
   t.deepEqual(Sun.object([['k', 'v'], ['x', 'y']]), {'k': 'v', 'x': 'y'})
   t.end()
@@ -206,8 +213,94 @@ test('values', function (t) {
   t.end()
 })
 
+test('L.item', function (t) {
+  t.deepEqual(L.item(['a', 'b', 'c'], 0), 'a')
+  t.deepEqual(L.item(['a', 'b', 'c'], -1), 'c')
+  t.deepEqual(L.item(['a', 'b', 'c'], -2), 'b')
+  t.deepEqual(L.item(['a', 'b', 'c'], -4), undefined)
+  t.deepEqual(L.item(['a', 'b', 'c'], 3), undefined)
+  t.end()
+})
+
+test('L.group', function (t) {
+  t.deepEqual(L.group([], 'x'), [['x']])
+  t.deepEqual(L.group([['x']], 'x'), [['x', 'x']])
+  t.deepEqual(L.group([['y']], 'x'), [['y'], ['x']])
+  t.end()
+})
+
 test('L.repeat', function (t) {
   t.deepEqual(L.repeat(['a', 'b', 'c'], 3), ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'])
   t.deepEqual(L.repeat([], 10), [])
+  t.end()
+})
+
+test('JSM', function (t) {
+  var i = 0, c = new Sun.Cage, j = new Sun.JSM(c)
+  j.when([['x', 1]], function (v, o, _, _, _, k) {
+    switch (i++) {
+    case 0:
+      t.ok(k == 'x')
+      t.ok(v == false)
+      t.ok(o == false)
+      break;
+    case 1:
+      t.ok(v == true)
+      t.ok(o == false)
+      break;
+    case 2:
+      t.ok(v == true)
+      t.ok(o == true)
+      break;
+    case 3:
+      t.ok(v == false)
+      t.ok(o == true)
+      break;
+    default:
+      t.ok(false)
+    }
+  })
+  c.change('x', 0)
+  c.change('x', 1)
+  c.change('x', 1)
+  c.change('x', 0)
+  j.never()
+  j.when([['x', null], ['y', 3]], function (v, o, _, _, _, k) {
+    switch (i++) {
+    case 4:
+      t.ok(v == false)
+      t.ok(o == false)
+      break;
+    case 5:
+      t.ok(v == true)
+      t.ok(o == false)
+      break;
+    case 6:
+      t.ok(v == true)
+      t.ok(o == true)
+      break;
+    case 7:
+      t.ok(v == false)
+      t.ok(o == true)
+      break;
+    case 100:
+      break;
+    default:
+      t.ok(false)
+    }
+  })
+  c.change('x', null)
+  c.change('y', 3)
+  c.change('x', null)
+  c.change('y', 'no')
+  j.when([['y', 'no']], function (v) {
+    if (v)
+      i = 100;
+    else
+      i = 0;
+  }, true)
+  t.ok(i == 100)
+  c.change('y', 'yes')
+  t.ok(i == 0)
   t.end()
 })

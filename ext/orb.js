@@ -37,7 +37,7 @@ var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
   },
   load: function (json) {
     var path = this.path || []
-    var part = Sun.lookup(json || {}, path)
+    var part = Sun.lookup(json, path)
     if (this.kids)
       this.kids.reduce(function (o, k) { return k.load(o), o }, part)
     else
@@ -46,12 +46,16 @@ var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
   },
   dump: function (json) {
     var path = this.path || []
-    var part = Sun.lookup(json || {}, path)
+    var part = Sun.lookup(json, path)
     if (this.kids)
       part = this.kids.reduce(function (o, k) { return k.dump(o) }, part)
     else
       part = this.elem.dump(part)
     return Sun.modify(json, path, part)
+  },
+  upon: function (t, f, c) {
+    var self = this;
+    return this.does('elem', 'upon', [t, function () { f.apply(self, arguments) }, c])
   },
   hide: function () { return this.does('elem', 'hide', arguments) },
   show: function () { return this.does('elem', 'show', arguments) },
@@ -69,7 +73,7 @@ var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
   },
   validate: function (b) {
     if (this.kids)
-      return this.kids.reduce(function (a, k) { return k.validate(a) }, dfn(b, true))
+      return this.kids.reduce(function (a, k) { return k.validate(a) && a }, dfn(b, true))
     return this.elem && this.elem.validate(b)
   }
 })
@@ -156,8 +160,9 @@ Sky.Elem.prototype.update({
     var self = this, dead;
     return this.doc().til(pointerup, function (e) {
       if (!self.node.contains(e.target))
-        dead = fun && fun.apply(self, arguments) || true;
-    }, function () { return dead }, true)
+        fun && fun.apply(self, arguments)
+      dead = !self.parent()
+    }, function () { return dead }, true), this;
   },
 
   press: function (o, opts) {

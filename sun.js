@@ -1,3 +1,10 @@
+var cp = function (o) {
+  if (o instanceof Array)
+    return o.slice()
+  if (o instanceof Object)
+    return up({}, o)
+  return o;
+}
 var up = function (a, b) {
   for (var k in b)
     a[k] = b[k]
@@ -108,11 +115,11 @@ var find = function (o, f) {
       return k;
 }
 
-var first = function (o, f) {
+var first = function (o, f, t) {
   for (var k in o) {
-    var v = o[k]
-    if (f(v))
-      return v;
+    var v = o[k], v_ = f(v)
+    if (v_)
+      return t ? v_ : v;
   }
 }
 
@@ -147,7 +154,7 @@ var get = function (o, k) {
 var has = function (o, k) {
   if (o instanceof Array)
     return any(o, keyEquate(k))
-  return k in o;
+  return o && k in o;
 }
 
 var set = function (o, k, v) {
@@ -172,6 +179,7 @@ var pop = function (o, k) {
 }
 
 var Sun = module.exports = {
+  cp: cp,
   up: up,
   ext: ext,
   cat: cat,
@@ -237,12 +245,12 @@ var Sun = module.exports = {
   modify: function (obj, path, val, empty) {
     var empty = def(nil(empty), {})
     var fun = (val instanceof Function) ? val : function () { return val }
-    var obj = def(obj, empty)
+    var o = def(obj, empty)
     if (path.length == 1)
-      return set(obj, path[0], fun(get(obj, path[0])))
+      return set(o, path[0], fun(get(o, path[0])))
     if (path.length)
-      return set(obj, path[0], Sun.modify(get(obj, path[0]), path.slice(1), fun, empty))
-    return val;
+      return set(o, path[0], Sun.modify(get(o, path[0]), path.slice(1), fun, empty))
+    return fun(obj)
   },
 
   remove: function (obj, path) {
@@ -269,6 +277,14 @@ var Sun = module.exports = {
     return obj;
   },
 
+  prepend: function (obj, path, pre) {
+    return Sun.modify(obj, path, function (v) { return cat(pre, v) })
+  },
+
+  either: function (alts) {
+    return first(alts, function (a) { return Sun.lookup(a[0], a[1]) }, true)
+  },
+
   object: function (iter) {
     return fold(function (a, i) { return (a[i[0]] = i[1]), a }, {}, iter)
   },
@@ -280,7 +296,7 @@ var Sun = module.exports = {
   },
 
   update: function (obj, iter) {
-    return fold(Sun.insert, obj, iter)
+    return fold(Sun.insert, obj || nil(iter), iter)
   },
 
   except: function (obj, iter) {
@@ -334,7 +350,10 @@ var O = Sun.op = up(function (value, change) {
   },
   '=': function (v, d) {
     return d;
-  }
+  },
+  update: Sun.update,
+  except: Sun.except,
+  select: Sun.select
 })
 
 // derive: copy the constructor with an extended prototype
@@ -423,6 +442,33 @@ Sun.Cage = cls(function Cage(obj, opt) {
   }
 })
 
+Sun.JSM = Sun.cls(function JSM(cage) {
+  this.__cage__ = cage || this;
+  this.__rules__ = []
+  return this;
+}, {
+  never: function () {
+    this.__rules__.reduce(function (cage, rule) {
+      return rule[0].map(function (p) { return cage.off(p[0], rule[1]) }, cage)
+    }, this.__cage__)
+    this.__rules__ = []
+    return this;
+  },
+  when: function (cond, fun, now) {
+    var self = this, cage = this.__cage__, rules = this.__rules__, i = rules.length;
+    var f = function (v, o, k) {
+      var O = all(cond, function (p) { return match(p[0] == k ? o : cage[p[0]], p[1]) })
+      var V = all(cond, function (p) { return match(p[0] == k ? v : cage[p[0]], p[1]) })
+      fun.call(self, V, O, i, v, o, k)
+    }
+    rules.push([cond, f])
+    cond.map(function (p) { cage.on(p[0], f) })
+    if (now)
+      f.call(cage)
+    return this;
+  }
+})
+
 Sun.URL = {
   format: function (url) {
     var str = ''
@@ -440,7 +486,7 @@ Sun.URL = {
   }
 }
 
-Sun.form = {
+var F = Sun.form = {
   encode: function (obj) {
     var list = []
     for (var k in obj)
@@ -454,6 +500,9 @@ Sun.form = {
       acc[kv[0]] = kv[1]
       return acc;
     }, {});
+  },
+  update: function (str, obj) {
+    return F.encode(up(F.decode(str), obj))
   }
 }
 
@@ -477,7 +526,7 @@ var H = Sun.http = up(function (method, url, fun, data, hdrs) {
 var L = Sun.list = up(function (x) {
   return x instanceof Array ? x : [x]
 }, {
-  last: function (list, n) { return list[list.length - (n || 1)] },
+  item: function (list, i) { return list && list[i < 0 ? list.length + i : i] },
   append: function (list, item) { return list.push(item), list },
   concat: function (item, list) { return [item].concat([].slice.call(list)) },
   drop: function (list, item) {
@@ -541,6 +590,14 @@ var L = Sun.list = up(function (x) {
         return c;
     }
     return (x.length < y.length) ? -1 : 0;
+  },
+  group: function (list, item, key) {
+    var key = key || Sun.key, g = L.item(list, -1), k = key(L.item(g, 0))
+    if (g && equals(key(item), k))
+      g.push(item)
+    else
+      list.push([item])
+    return list;
   }
 })
 
@@ -606,11 +663,21 @@ var T = Sun.time = up(function (set, rel) {
       return new Date(Date.UTC(datep[0], datep[1] - 1, datep[2], timep[0], timep[1], timep[2]))
     return new Date(datep[0], datep[1] - 1, datep[2], timep[0], timep[1], timep[2])
   },
-  datestamp: function (t) {
-    return t.getFullYear() + '/' + pad(t.getMonth() + 1) + '/' + pad(t.getDate())
+  datestamp: function (t, opt) {
+    var opt = opt || {}
+    var datep =
+        (opt.utc
+         ? [t.getUTCFullYear(), pad(t.getUTCMonth() + 1), pad(t.getUTCDate())]
+         : [t.getFullYear(), pad(t.getMonth() + 1), pad(t.getDate())])
+    return datep.join(opt.dsep || '-')
   },
-  timestamp: function (t) {
-    return pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds())
+  timestamp: function (t, opt) {
+    var opt = opt || {}
+    var timep =
+        (opt.utc
+         ? [pad(t.getUTCHours()), pad(t.getUTCMinutes()), pad(t.getUTCSeconds())]
+         : [pad(t.getHours()), pad(t.getMinutes()), pad(t.getSeconds())])
+    return timep.join(opt.tsep || ':') + (opt.utc ? 'Z' : '')
   },
   stamp: function (t) { return T.datestamp(t) + ' ' + T.timestamp(t) },
   fromGregorian: function (s) { return new Date((s - 62167219200) * 1000) },

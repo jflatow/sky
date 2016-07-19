@@ -4,6 +4,7 @@ var add = function (p, d) { return isFinite(d) ? p + d : d }
 var dfn = function (x, d) { return isNaN(x) ? d : x }
 var fnt = function (x, d) { return isFinite(x) ? x : d }
 var get = function (a, k, d) { var v = a[k]; return v == undefined ? d : v }
+var set = function (a, k, v) { var a = a || {}; a[k] = v; return a }
 var pop = function (a, k, d) { var v = get(a, k, d); delete a[k]; return v }
 var pre = function (a, k, d) { return a[k] = get(a, k, d) }
 var map = function (a, f) { return [].concat(a || []).map(f) }
@@ -26,6 +27,7 @@ var util = {
   dfn: dfn,
   fnt: fnt,
   get: get,
+  set: set,
   pop: pop,
   pre: pre,
   map: map,
@@ -427,7 +429,7 @@ Elem.prototype.update({
         b = false;
       this.instate(v, 'invalidated')
     }
-    return this.fold(function (a, c) { return Sky.elem(c).validate(a) }, dfn(b, true))
+    return this.fold(function (a, c) { return Sky.elem(c).validate(a) && a }, dfn(b, true))
   },
   instate: function (b, c, d) {
     var b = dfn(b, true)
@@ -512,7 +514,9 @@ Elem.prototype.update({
       return str;
     }
     for (var selector in rules)
-      sheet.insertRule(selector + '{' + rec(selector, rules[selector]) + '}', i++)
+      try {
+        sheet.insertRule(selector + '{' + rec(selector, rules[selector]) + '}', i++)
+      } catch (e) { console.error(e) }
     return i;
   },
 
@@ -559,7 +563,7 @@ Elem.prototype.update({
     return this;
   },
   upon: function (types, fun, capture) {
-    var self = this, f = function (e) { return fun.call(self, e.detail.value, e) }
+    var self = this, f = function (e) { return fun.call(self, get(e.detail || {}, 'value'), e) }
     return this.on(types, f, capture)
   },
   once: function (types, fun, capture) {
@@ -576,6 +580,18 @@ Elem.prototype.update({
     }, capture)
   },
 
+  a: function (attrs, props) {
+    return this.child('a', attrs, props)
+  },
+  p: function (attrs, props) {
+    return this.child('p', attrs, props)
+  },
+  div: function (attrs, props) {
+    return this.child('div', attrs, props)
+  },
+  span: function (attrs, props) {
+    return this.child('span', attrs, props)
+  },
   hl: function (text, level) {
     return this.child('h' + (level || 1)).txt(text)
   },
@@ -583,16 +599,10 @@ Elem.prototype.update({
     return this.child('li').txt(text)
   },
   link: function (href) {
-    return this.child('a').href(href)
+    return this.a().href(href)
   },
   para: function (text) {
-    return this.child('p').txt(text)
-  },
-  div: function (attrs, props) {
-    return this.child('div', attrs, props)
-  },
-  span: function (attrs, props) {
-    return this.child('span', attrs, props)
+    return this.p().txt(text)
   },
 
   svg: function (attrs, props) {
@@ -741,7 +751,7 @@ Elem.prototype.update({
   },
 
   load: function (json) {
-    var n = this.node, t = n.type, json = n.name ? json[n.name] : json;
+    var n = this.node, t = n.type, json = n.name && json ? json[n.name] : json;
     if (json !== undefined) {
       if (t == 'button' || t == 'reset' || t == 'submit')
         return this;
@@ -761,14 +771,13 @@ Elem.prototype.update({
         n.value = json || ''
       else if (n.childElementCount)
         this.fold(function (_, c) {
-          Sky.elem(c).load(c.name ? json[c.name] : json)
+          Sky.elem(c).load(c.name && json ? json[c.name] : json)
         })
     }
     return this;
   },
 
   dump: function (json) {
-    var json = json || {}
     var n = this.node, t = n.type, p;
     if (t == 'button' || t == 'reset' || t == 'submit')
       return json;
@@ -795,11 +804,11 @@ Elem.prototype.update({
     else
       p = n.value;
     if (p !== undefined)
-      return n.name ? ((json[n.name] = p), json) : p;
+      return n.name ? set(json, n.name, p) : p;
     if (n.childElementCount)
-      return this.fold(function (o, c) {
+      this.fold(function (o, c) {
         return Sky.elem(c).dump(o)
-      }, n.name ? pre(json, n.name, {}) : json)
+      }, n.name ? pre(json = json || {}, n.name, {}) : json)
     return json;
   },
 
@@ -817,6 +826,8 @@ Elem.prototype.update({
     var elem = this.child('button', desc, props)
     if (icon)
       elem.icon.apply(elem, [].concat(icon))
+    if (icon && label)
+      elem.text(label);
     else if (label)
       elem.txt(label)
     return elem.on('click', action.bind(elem))

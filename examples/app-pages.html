@@ -216,6 +216,7 @@
         }
 
         main.launch({tag: 'skej', prev: {tag: 'settings'}})
+        main.on('pageType', function (t) { console.log(t) })
       })();
     </script>
   </body>

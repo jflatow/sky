@@ -4,27 +4,26 @@ var Orb = require('../ext/orb')
 var UFO = require('../kit/ufo')
 
 var U = Sky.util, P = Sky.path, dfn = U.dfn, pop = U.pop, pre = U.pre;
-var L = Sun.list, up = Sun.up, cat = Sun.cat, get = Sun.get, map = Sun.map;
+var L = Sun.list, cp = Sun.cp, up = Sun.up, get = Sun.get, map = Sun.map;
 
 var optify = function (opts, key, over) {
   return up((opts instanceof Object) ? opts : Sun.object([[key, opts]]), over)
 }
 
-var prepend = function (opts, path, pre) {
-  return Sun.modify(opts, path, function (v) { return cat(pre, v) })
-}
-
 var Widget = Orb.derive({
   stdOpts: function (o, f, c, d) {
-    var opts = this.opts = up(f ? d || {} : this.opts, o)
+    var opts = this.opts = up(f ? up(d || {}, this.opts) : this.opts, o)
     if (f || o.classes)
       this.elem.attrs({class: c || ''}).addClass(opts.classes)
     if (o.style)
       this.elem.style(opts.style)
     if (o.upon)
-      Sun.fold(function (e, i, w) { return e.upon(i[0], i[1]) }, this.elem, o.upon)
+      Sun.fold(function (e, i, w) { return e.upon(i[0], i[1]) }, this, o.upon)
     return opts;
   },
+
+  fadeHide: function (b) { this.elem.fadeHide(b) },
+  fadeRemove: function (b) { this.elem.fadeRemove(b) },
 
   // direct manipulation methods
   createKid: function (desc, elem) {
@@ -99,26 +98,27 @@ var Widget = Orb.derive({
     return map(data, this.bind('removeItemFor'))
   },
 
-  peel: function (json) { var f = this.opts.peel; return f ? f.call(this, json) : json },
-  wrap: function (json) { var f = this.opts.wrap; return f ? f.call(this, json) : json },
+  peel: function (json) { var o = this.opts, f = o && o.peel; return f ? f.call(this, json) : json },
+  wrap: function (json) { var o = this.opts, f = o && o.wrap; return f ? f.call(this, json) : json },
   load: function (json) {
+    var path = this.path || [], peel = this.bind('peel')
     if (this.item) {
       this.removeItems()
-      this.obtainItemsFor(Sun.lookup(json || {}, this.path || []))
+      this.obtainItemsFor(Sun.lookup(json, path))
       return this;
     }
-    return Orb.prototype.load.apply(this, arguments)
+    return Orb.prototype.load.call(this, Sun.modify(cp(json), path, peel))
   },
 
   dump: function (json) {
+    var path = this.path || [], wrap = this.bind('wrap')
     if (this.item) {
-      var wrap = this.bind('wrap')
       var data = map(this.getItems(), function (i) {
         return wrap(i.path ? i.dump([])[0] : i.dump())
       })
-      return Sun.modify(json, this.path || [], data)
+      return Sun.modify(json, path, data)
     }
-    return Orb.prototype.dump.apply(this, arguments)
+    return Sun.modify(Orb.prototype.dump.call(this, json), path, wrap)
   },
 
   // path manipulation methods
@@ -167,10 +167,31 @@ Orb.thru(Widget.prototype, {
   kids: 'base',
   opts: 'base',
   path: 'opts',
+  keys: 'opts',
   item: 'opts'
 })
 
 Sky.Elem.prototype.update({
+  fade: function (b, f, r) {
+    var b = dfn(b, true), r = r || 1.5;
+    return this.animate(function (n, i) {
+      var o = Math.max(getComputedStyle(n).opacity, .005)
+      if (b) {
+        if (o > 0.01 && i < 100)
+          return n.style.opacity = o / r;
+        f && f(b)
+      } else {
+        if (i == 0)
+          f && f(b)
+        if (o < 0.99 && i < 100)
+          return n.style.opacity = o * r;
+      }
+    })
+  },
+
+  fadeHide: function (b) { this.fade(b, this.bind('hide')) },
+  fadeRemove: function (b) { this.fade(b, this.bind('remove')) },
+
   stack: Widget.type(function Stack(root, opts, elem) {
     this.elem = elem || root.g()
     this.kids = []
@@ -233,7 +254,7 @@ Sky.Elem.prototype.update({
         this.removeKids()
         map(['head', 'body', 'foot'], function (k, i) {
           self[k] = opts[k] && self.createKid(opts[k])
-          self[k] && self[k].elem.addClass(k)
+          self[k] && Orb.do(self[k].elem, 'addClass', [k])
         })
       }
     },
@@ -262,7 +283,7 @@ Sky.Elem.prototype.update({
           'align-items': 'center'
         },
         '.field.inline .description': {
-          'flex': '1 1 80%'
+          'flex': '1 1 30%'
         },
         '.field.inline .epithet': {
           'padding': '0 2em 0 0'
@@ -277,7 +298,8 @@ Sky.Elem.prototype.update({
         '.field .epithet': {
           'padding': '0 0 1ex 0',
           'font-size': '0.8em',
-          'font-weight': 600
+          'font-weight': 600,
+          'color': theme.color('medium-text')
         },
         '.field .advice': {
           'padding': '0 0 1ex 0',
@@ -335,7 +357,8 @@ Sky.Elem.prototype.update({
 
         '.panel > .title-bar': {
           'background-color': theme.color('light-bg'),
-          'border-bottom': theme.border('crisp-br')
+          'border-bottom': theme.border('crisp-br'),
+          'color': theme.color('medium-text')
         },
 
         '.panel > .title-bar .body': {
@@ -349,11 +372,11 @@ Sky.Elem.prototype.update({
       if (f || o.title || o.items || o.status) {
         var b = {}
         if (opts.title)
-          b.head = ['barbell', prepend(optify(opts.title, 'body'), ['classes'], ['title-bar'])]
+          b.head = ['barbell', Sun.prepend(optify(opts.title, 'body'), ['classes'], ['title-bar'])]
         if (opts.items)
           b.body = ['stack', {items: opts.items}]
         if (opts.status)
-          b.foot = ['barbell', prepend(optify(opts.status, 'body'), ['classes'], ['status-bar'])]
+          b.foot = ['barbell', Sun.prepend(optify(opts.status, 'body'), ['classes'], ['status-bar'])]
         this.base.setOpts(b)
       }
     }
@@ -362,8 +385,6 @@ Sky.Elem.prototype.update({
   popup: Widget.type(function Popup(root, opts) {
     this.base = root.pillar()
     this.setOpts(opts || {}, true)
-    this.elem.tapout(this.activate.bind(this, false))
-    this.activate()
   }, {
     __css__: function (theme) {
       return {
@@ -385,8 +406,16 @@ Sky.Elem.prototype.update({
       var elem = this.elem
           .align(abox.shift(dx, dy), ax, ay).anchor(bx, by)
           .style({position: opts.fixed ? 'fixed' : 'absolute', zIndex: 1})
-      if (f || o.items)
+      if (f || o.head || o.body || o.foot)
         this.base.setOpts(Sun.select(opts, ['head', 'body', 'foot']))
+      if (f || o.activate)
+        this.activate(dfn(opts.activate, true))
+      if (f && o.activate == false)
+        this.elem.hide()
+      if (f && !o.inert)
+        this.elem.tapout(this.activate.bind(this, false))
+      if (o.timer)
+        setTimeout(this.activate.bind(this, false), o.timer)
     },
 
     activate: function (b, r) {
@@ -401,12 +430,12 @@ Sky.Elem.prototype.update({
   }, {
     __css__: function (theme) {
       return {
-        '.list-editor .stack:empty': {
+        '.list-editor > .stack:empty': {
           'padding': '1em',
           'text-align': 'center'
         },
 
-        '.list-editor .stack:empty::after': {
+        '.list-editor > .stack:empty::after': {
           'content': '"No items"',
           'font-size': '0.8em',
           'color': theme.color('light-text')
@@ -416,12 +445,12 @@ Sky.Elem.prototype.update({
           'border-top': theme.border('gentle-br')
         },
 
-        '.list-editor-item .foot': {
+        '.list-editor-item > .foot': {
           'opacity': 0,
           'transition': 'opacity 0.3s'
         },
 
-        '.list-editor-item:hover .foot': {
+        '.list-editor-item:hover > .foot': {
           'opacity': 1,
           'transition': 'opacity 0.3s'
         }
@@ -459,7 +488,7 @@ Sky.Elem.prototype.update({
     }
   }),
 
-  tokenListEditor: Widget.type(function (root, opts) {
+  tokenListEditor: Widget.type(function TokenListEditor(root, opts) {
     var self = this;
     var base = this.base = root.stack({items: [['input']]})
     var input = this.inp = base.kids.splice(0, 1)[0]
@@ -489,7 +518,8 @@ Sky.Elem.prototype.update({
           'margin': '0.25ex',
           'padding': '0 1ex',
           'overflow': 'hidden',
-          'text-overflow': 'ellipsis'
+          'text-overflow': 'ellipsis',
+          'cursor': 'pointer'
         },
         '.token-list-editor output.activated': {
           'border': theme.border('focus-br'),
@@ -537,7 +567,7 @@ Sky.Elem.prototype.update({
         return this.removeKid(active)
       if (this.inp.node.value == '') {
         if (kids.length)
-          return this.selectKid(L.last(kids))
+          return this.selectKid(L.item(kids, -1))
       }
     }
   }),
@@ -563,14 +593,20 @@ var Std = module.exports = UFO.derive({
 
   Theme: UFO.Theme.derive({
     colors: {
+      'primary': Sky.rgb(99, 181, 228),
+      'accent': Sky.rgb(254, 203, 46),
+      'danger': Sky.rgb(218, 51, 49),
       'invalid': Sky.rgb(255, 192, 203),
       'crisp-br': Sky.rgb(220, 220, 220),
       'gentle-br': Sky.rgb(240, 240, 240),
       'focus-br': Sky.rgb(169, 209, 225),
+      'hover-br': Sky.rgb(180, 180, 180),
       'white-bg': Sky.rgb(255, 255, 255),
       'faint-bg': Sky.rgb(252, 252, 252),
       'light-bg': Sky.rgb(246, 246, 246),
-      'light-text': Sky.rgb(110, 110, 110)
+      'light-text': Sky.rgb(110, 110, 110),
+      'medium-text': Sky.rgb(80, 80, 80),
+      'dark-text': Sky.rgb(33, 33, 33)
     }
   }),
 
@@ -585,21 +621,55 @@ var Std = module.exports = UFO.derive({
         .transform({rotate: 45})
     },
 
-    __css__: {
-      '*': {
-        'box-sizing': 'border-box'
-      },
-      '*[hidden]': {
-        'display': 'none !important'
-      },
+    __css__: function (theme) {
+      return {
+        '*': {
+          'box-sizing': 'border-box',
+        },
+        '*[hidden]': {
+          'display': 'none !important'
+        },
 
-      'button': {
-        'cursor': 'pointer'
-      },
+        'button': {
+          'cursor': 'pointer'
+        },
 
-      '.icon': {
-        'width': '2em',
-        'height': '2em'
+        'button': {
+          'padding': '1em',
+          'background': 'none',
+          'border': theme.border('crisp-br'),
+          'color': theme.color('primary'),
+          'cursor': 'pointer',
+          'font-weight': 600,
+          'transition': 'all 0.3s'
+        },
+
+        'button:hover': {
+          'border': theme.border('hover-br'),
+          'transition': 'all 0.3s'
+        },
+
+        'button.add, button.remove': {
+          'padding': '0 1em',
+          'border': '0'
+        },
+
+        'button.add': {
+          'fill': theme.color('accent')
+        },
+
+        'button.remove': {
+          'fill': theme.color('danger')
+        },
+
+        '.danger button': {
+          'color': theme.color('danger')
+        },
+
+        '.icon': {
+          'width': '2em',
+          'height': '2em'
+        }
       }
     }
   })
