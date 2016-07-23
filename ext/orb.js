@@ -9,9 +9,10 @@ var id = function (o) { return o }
 var noop = function () {}
 
 var touch = typeof(ontouchstart) != 'undefined';
+var pointerup = touch ? 'touchend' : 'mouseup';
 var pointerdown = touch ? 'touchstart' : 'mousedown';
 var pointermove = touch ? 'touchmove' : 'mousemove';
-var pointerup = touch ? 'touchend touchcancel' : 'mouseup';
+var pointerexit = [pointerup, touch ? 'touchcancel' : 'mouseleave'].join(' ')
 
 var Orb = Sun.cls(function Orb(obj) { up(this, obj) }, {
   bind: Sky.Elem.prototype.bind,
@@ -158,11 +159,12 @@ Sky.Elem.prototype.update({
 
   tapout: function (fun, opts) {
     var self = this, dead;
-    return this.doc().til(pointerup, function (e) {
+    this.doc().til(pointerup, function (e) {
       if (!self.node.contains(e.target))
         fun && fun.apply(self, arguments)
       dead = !self.parent()
-    }, function () { return dead }, true), this;
+    }, function () { return dead }, true)
+    return this;
   },
 
   press: function (o, opts) {
@@ -173,7 +175,7 @@ Sky.Elem.prototype.update({
       i = setInterval(function () { Orb.move(o, opts.gain) }, opts.every)
       if (opts.prevent)
         e.preventDefault()
-      doc.once(pointerup, function (e) {
+      doc.once(pointerexit, function (e) {
         Orb.free(o, e)
         clearInterval(i)
         if (opts.prevent)
@@ -202,7 +204,7 @@ Sky.Elem.prototype.update({
         if (opts.prevent)
           e.preventDefault()
       })
-      doc.once(pointerup, function (e) {
+      doc.once(pointerexit, function (e) {
         that.off(pointermove, move)
         Orb.free(o, e)
         if (opts.prevent)
