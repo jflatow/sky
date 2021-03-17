@@ -12,6 +12,9 @@
     "type" : "git",
     "url" : "https://github.com/jflatow/sky.git"
   },
+  "dependencies": {
+    "jsdom": "latest"
+  },
   "devDependencies": {
     "browserify": "latest",
     "gh-pages": "latest",
